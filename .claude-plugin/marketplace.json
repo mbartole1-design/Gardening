@@ -1,0 +1,5 @@
+{
+  "name": "milan-mods",
+  "owner": { "name": "mbartole1-design" },
+  "plugins": [{ "name": "datebook-tabs", "source": "./mods/datebook-tabs" }]
+}

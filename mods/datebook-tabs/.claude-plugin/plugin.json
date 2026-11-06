@@ -1,0 +1,8 @@
+{
+  "name": "datebook-tabs",
+  "version": "0.1.0",
+  "description": "Shows this project's threads as date-book tabs down the right edge",
+  "author": { "name": "mbartole1-design" },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}
