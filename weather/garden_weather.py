@@ -880,6 +880,12 @@ def render(meta, res, et_src):
         if rr:
             w(f"Rain: {site['name']} caught {rr:.2f}× the town station's rain over the same days, so the long-term rain "
               "totals are scaled by that.")
+        if site.get("lows_from_summary"):
+            w("")
+            w("The daily exports only had highs, so night-time differences come from the station's monthly summaries "
+              "(`monthly_summary.csv`): average low = 2 × monthly mean temperature − average daily high, corrected by the "
+              "small gap between the hourly mean and the high/low midpoint measured at Pangborn. Treat the lows column as "
+              "good to about ±1°F.")
         if site.get("high_only"):
             w("")
             w("**Only daily highs were in these files**, so nights, frost dates and chill still come from the town "
@@ -965,6 +971,7 @@ def main():
                     r["pcpn"] = p["pcpn"]
         days = sorted(pws)
         meta["site"] = {"name": a.pws_name, "base_name": meta["name"], "offsets": offsets,
+                        "lows_from_summary": any(v.get("lo") is not None for v in summary.values()),
                         "high_only": all(p.get("tmin") is None for p in pws.values()) and not any(
                             v.get("lo") is not None for v in summary.values()),
                         "days": len(days), "first": days[0], "last": days[-1]}

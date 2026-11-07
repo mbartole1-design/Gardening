@@ -52,7 +52,9 @@ Pitcher Canyon's highs and lows run in each month, and shifts the 95-year town r
 station has its own readings, they're used directly. The report then shows frost dates, heat, water loss and chill
 for your site, plus a table of the monthly differences. The CSV reader accepts daily summaries (high/low columns) or
 individual observations (a single temperature column), and Weather Underground's monthly export (daily highs,
-°C or °F). With highs only, nights, frost dates and chill keep using the town station's lows, while rain is scaled
+°C or °F). If you also add a `monthly_summary.csv`
+(year, month, avg_low_f) read off the station's monthly summaries, night-time offsets come from that; with highs only,
+nights, frost dates and chill keep using the town station's lows, while rain is scaled
 by how much more the personal station catches. Other stations work too: `--pws-name` and `--pws-elev` set
 their name and elevation.
 
