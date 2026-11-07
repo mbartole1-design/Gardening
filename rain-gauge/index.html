@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wenatchee Rain Gauge</title>
+<style>
+:root {
+  --bg: #f4f1ea;
+  --card: #fffdf8;
+  --ink: #23302a;
+  --muted: #6b766f;
+  --line: #c9cfc8;
+  --glass: rgba(255,255,255,0.65);
+  --glass-edge: #9aa69f;
+  --water: #2f7fc1;
+  --water-top: #5aa4dd;
+  --avg: #c0612b;
+  --norm: #6a8a3a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141a17; --card: #1c2420; --ink: #e6ece7; --muted: #9aa8a0; --line: #36423c;
+    --glass: rgba(255,255,255,0.05); --glass-edge: #66756d;
+    --water: #3d8fd1; --water-top: #6fb3e8; --avg: #e8874d; --norm: #a3c46a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141a17; --card: #1c2420; --ink: #e6ece7; --muted: #9aa8a0; --line: #36423c;
+  --glass: rgba(255,255,255,0.05); --glass-edge: #66756d;
+  --water: #3d8fd1; --water-top: #6fb3e8; --avg: #e8874d; --norm: #a3c46a;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: 24px 16px 40px;
+}
+main { max-width: 860px; margin: 0 auto; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 18px; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--muted); font-size: 13px; }
+.controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+select { font: inherit; font-size: 13px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; max-width: 100%; }
+button {
+  font: inherit; font-size: 13px; color: var(--ink); background: var(--card);
+  border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--glass-edge); }
+.gauges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.gauge {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 10px 16px; text-align: center; cursor: pointer;
+}
+.gauge h2 { font-size: 15px; margin: 0; }
+.gauge .range { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+.gauge svg { width: 100%; max-width: 230px; height: auto; display: block; margin: 0 auto; overflow: visible; }
+.total { font-size: 30px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.total small { font-size: 14px; font-weight: 500; color: var(--muted); }
+.stats { font-size: 12.5px; margin-top: 6px; display: grid; gap: 2px; }
+.stats .k { color: var(--muted); }
+.sw { display: inline-block; width: 14px; height: 0; border-top: 2px dashed var(--avg); vertical-align: middle; margin-right: 4px; }
+.sw.norm { border-top: 2px solid var(--norm); }
+.pct { margin-top: 6px; font-size: 12.5px; font-weight: 600; }
+.tick { stroke: var(--glass-edge); }
+.ticklabel { fill: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; font-size: 12.5px; color: var(--muted); margin: 16px 0 6px; }
+.status { text-align: center; color: var(--muted); padding: 60px 0; }
+.status.err { color: var(--avg); }
+footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.5; }
+@media (max-width: 620px) {
+  .gauges { grid-template-columns: 1fr; }
+  .gauge svg { max-width: 200px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Wenatchee rain gauge</h1>
+      <div class="sub" id="sub">Loading rain records…</div>
+    </div>
+    <div class="controls">
+      <label class="sub" for="station">Station</label>
+      <select id="station" title="Which station this year's rain comes from"></select>
+      <button id="replay" type="button" title="Run the fill animation again">Refill</button>
+    </div>
+  </header>
+  <div id="status" class="status">Fetching NOAA station data…</div>
+  <section class="gauges" id="gauges" hidden></section>
+  <div class="legend" id="legend" hidden>
+    <span><span class="sw"></span>Average for the whole period</span>
+    <span><span class="sw norm"></span>Normal by this date</span>
+    <span>Averages: 1996–2025</span>
+  </div>
+  <footer id="foot"></footer>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const ACIS = "https://data.rcc-acis.org/StnData";
+  // Long-record stations used for the 1996-2025 averages.
+  const PRIMARY = { sid: "USC00459074", name: "Wenatchee town" };
+  const BACKUP  = { sid: "USW00094239", name: "Pangborn airport" };
+  // Stations you can read this year's rain from. CoCoRaHS volunteers post each morning.
+  const CURRENT = [
+    { sid: "US1WACH0051", name: "Wenatchee 1.5 WSW", short: "1,050 ft", note: "CoCoRaHS, 1,050 ft, closest toward Squilchuck" },
+    { sid: "US1WACH0013", name: "Wenatchee 1.0 WSW", short: "900 ft", note: "CoCoRaHS, 900 ft" },
+    { sid: "USC00459074", name: "Wenatchee town", short: "626 ft", note: "NOAA co-op, 626 ft, same station as the averages" },
+    { sid: "USW00094239", name: "Pangborn airport", short: "1,238 ft", note: "NOAA, 1,238 ft, East Wenatchee plateau" }
+  ];
+  const STN_KEY = "rain-gauge-station";
+  const NORMAL_FROM = 1996, NORMAL_TO = 2025;
+  const CACHE_KEY = "rain-gauge-v2";
+  const CACHE_FRESH_MS = 3 * 3600 * 1000;
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const MON = MONTHS.map(m => m.slice(0, 3));
+
+  // ---------- dates ----------
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const nice = d => `${MON[d.getMonth()]} ${d.getDate()}`;
+  function daysBetween(a, b) { // inclusive list
+    const out = [];
+    for (let d = a; d <= b; d = addDays(d, 1)) out.push(d);
+    return out;
+  }
+
+  // ---------- data ----------
+  function val(x) {
+    if (x == null || x === "M" || x === "S" || x === "") return null;
+    if (x === "T") return 0;
+    const v = parseFloat(String(x).replace(/A$/, ""));
+    return Number.isFinite(v) ? v : null;
+  }
+  async function fetchStation(sid, edate, sdate = `${NORMAL_FROM}-01-01`) {
+    const r = await fetch(ACIS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sid, sdate, edate, elems: [{ name: "pcpn" }] })
+    });
+    if (!r.ok) throw new Error(`NOAA returned ${r.status}`);
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    return j.data;
+  }
+  function readCache() {
+    try { const c = JSON.parse(localStorage.getItem(CACHE_KEY)); return c && c.primary ? c : null; }
+    catch (e) { return null; }
+  }
+  function writeCache(c) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch (e) {} }
+
+  async function loadData() {
+    const today = iso(new Date());
+    const cached = readCache();
+    if (cached && cached.day === today && Date.now() - cached.at < CACHE_FRESH_MS) return { ...cached, note: "" };
+    try {
+      const since = `${new Date().getFullYear() - 1}-12-20`;
+      const cocorahs = CURRENT.filter(c => c.sid !== PRIMARY.sid && c.sid !== BACKUP.sid);
+      const [primary, backup, ...cur] = await Promise.all([
+        fetchStation(PRIMARY.sid, today), fetchStation(BACKUP.sid, today),
+        ...cocorahs.map(c => fetchStation(c.sid, today, since).catch(() => []))
+      ]);
+      const current = {};
+      cocorahs.forEach((c, i) => { current[c.sid] = cur[i]; });
+      current[PRIMARY.sid] = primary; current[BACKUP.sid] = backup;
+      const c = { day: today, at: Date.now(), primary, backup, current };
+      writeCache(c);
+      return { ...c, note: "" };
+    } catch (e) {
+      if (cached) return { ...cached, note: `Couldn't reach NOAA (${e.message}); showing data saved ${new Date(cached.at).toLocaleString()}.` };
+      throw e;
+    }
+  }
+
+  // Merge station records in priority order; days missing from the first are filled from the next.
+  function mergeChain(series, fromDate) {
+    const map = new Map(), filled = new Set();
+    series.forEach((rows, i) => {
+      for (const [d, x] of rows || []) {
+        if (fromDate && d < fromDate) continue;
+        const v = val(x);
+        if (v == null || map.has(d)) continue;
+        map.set(d, v);
+        if (i > 0) filled.add(d);
+      }
+    });
+    return { map, filled };
+  }
+  function chosenStation() {
+    let sid = null;
+    try { sid = localStorage.getItem(STN_KEY); } catch (e) {}
+    return CURRENT.find(c => c.sid === sid) || CURRENT[0];
+  }
+
+  // Sum of a list of dates; null if too many are missing.
+  function sumDays(map, dates, tolerance) {
+    let s = 0, miss = 0;
+    for (const d of dates) { const v = map.get(iso(d)); if (v == null) miss++; else s += v; }
+    if (miss > Math.floor(dates.length * tolerance)) return null;
+    return miss ? s * dates.length / (dates.length - miss) : s;
+  }
+  // Average over the normal years of the same calendar span, shifted by year.
+  function normal(map, dates) {
+    const cy = dates[0].getFullYear(), sums = [];
+    for (let y = NORMAL_FROM; y <= NORMAL_TO; y++) {
+      const shifted = [];
+      for (const d of dates) {
+        const s = new Date(d.getFullYear() + (y - cy), d.getMonth(), d.getDate());
+        if (s.getMonth() === d.getMonth()) shifted.push(s); // skips Feb 29 in non-leap years
+      }
+      if (!shifted.length) continue;
+      const v = sumDays(map, shifted, dates.length >= 28 ? 0.1 : 0);
+      if (v != null) sums.push(v);
+    }
+    return sums.length ? { avg: sums.reduce((a, b) => a + b, 0) / sums.length, years: sums.length } : null;
+  }
+
+  function compute(map, filled, normMap) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let last = today;
+    for (let i = 0; i < 40 && map.get(iso(last)) == null; i++) last = addDays(last, -1);
+    const y0 = new Date(today.getFullYear(), 0, 1), y1 = new Date(today.getFullYear(), 11, 31);
+    const m0 = new Date(today.getFullYear(), today.getMonth(), 1), m1 = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const w0 = addDays(today, -today.getDay()), w1 = addDays(w0, 6); // Sunday to Saturday
+
+    function gauge(key, title, rangeLabel, start, end) {
+      const toDate = last >= start ? daysBetween(start, last) : [];
+      const total = toDate.reduce((s, d) => s + (map.get(iso(d)) ?? 0), 0);
+      const nFilled = toDate.filter(d => filled.has(iso(d))).length;
+      const full = normal(normMap, daysBetween(start, end));
+      const byNow = toDate.length ? normal(normMap, toDate) : { avg: 0 };
+      return { key, title, rangeLabel, total, full, byNow, nFilled, started: toDate.length > 0 };
+    }
+    return {
+      last, today,
+      gauges: [
+        gauge("year", `${today.getFullYear()}`, `Jan 1 – ${nice(last)}`, y0, y1),
+        gauge("month", MONTHS[today.getMonth()], `${nice(m0)} – ${nice(last < m0 ? m0 : last)}`, m0, m1),
+        gauge("week", "This week", `${nice(w0)} – ${nice(w1)} (Sun–Sat)`, w0, w1)
+      ]
+    };
+  }
+
+  // ---------- drawing ----------
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs = {}, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const fmt = v => v >= 10 ? v.toFixed(1) : v.toFixed(2);
+
+  function scaleFor(maxVal) {
+    const target = Math.max(maxVal * 1.15, 0.1);
+    const steps = [0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5];
+    let step = steps[steps.length - 1];
+    for (const s of steps) if (target / s <= 6) { step = s; break; }
+    const top = Math.ceil(target / step) * step;
+    const minor = step / (String(step).match(/^(2|0\.2|0\.02)/) ? 4 : 5);
+    return { top, step, minor };
+  }
+
+  const G = { w: 220, h: 340, tx: 72, tw: 56, top: 26, bot: 318 };
+  let uid = 0;
+  function drawGauge(card, g) {
+    const id = "g" + (uid++);
+    const maxVal = Math.max(g.total, g.full ? g.full.avg : 0, g.byNow ? g.byNow.avg : 0);
+    const sc = scaleFor(maxVal);
+    const yOf = v => G.bot - (v / sc.top) * (G.bot - G.top);
+    const svg = el("svg", { viewBox: `0 0 ${G.w} ${G.h}`, role: "img",
+      "aria-label": `${g.title}: ${fmt(g.total)} inches${g.full ? `, average ${fmt(g.full.avg)}` : ""}` });
+    const defs = el("defs", {}, svg);
+    const r = G.tw / 2, x0 = G.tx, x1 = G.tx + G.tw;
+    const tube = `M${x0},${G.top - 8} L${x0},${G.bot} Q${x0},${G.bot + 14} ${x0 + 12},${G.bot + 14} L${x1 - 12},${G.bot + 14} Q${x1},${G.bot + 14} ${x1},${G.bot} L${x1},${G.top - 8} Z`;
+    el("path", { d: tube }, el("clipPath", { id: id + "c" }, defs));
+    const grad = el("linearGradient", { id: id + "w", x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
+    el("stop", { offset: "0", "stop-color": "var(--water)", "stop-opacity": "0.85" }, grad);
+    el("stop", { offset: "0.45", "stop-color": "var(--water-top)", "stop-opacity": "0.95" }, grad);
+    el("stop", { offset: "1", "stop-color": "var(--water)", "stop-opacity": "0.85" }, grad);
+
+    // glass
+    el("path", { d: tube, fill: "var(--glass)" }, svg);
+    // water (body + wavy surface), clipped to tube
+    const wg = el("g", { "clip-path": `url(#${id}c)` }, svg);
+    const water = el("rect", { x: x0 - 2, width: G.tw + 4, y: G.bot + 16, height: 0, fill: `url(#${id}w)` }, wg);
+    const wave = el("path", { fill: "var(--water-top)", opacity: "0.9" }, wg);
+    // ticks
+    const ticks = el("g", {}, svg);
+    for (let v = 0; v <= sc.top + 1e-9; v += sc.minor) {
+      const major = Math.abs(v / sc.step - Math.round(v / sc.step)) < 1e-6;
+      const y = yOf(v);
+      el("line", { x1: x0, x2: x0 + (major ? 16 : 8), y1: y, y2: y, class: "tick", "stroke-width": major ? 1.4 : 0.8 }, ticks);
+      if (major) {
+        const t = el("text", { x: x0 - 6, y: y + 3.5, "text-anchor": "end", class: "ticklabel" }, ticks);
+        t.textContent = sc.step < 0.1 ? v.toFixed(2) : sc.step < 1 ? v.toFixed(sc.step === 0.25 ? 2 : 1) : v.toFixed(sc.step === 2.5 ? 1 : 0);
+      }
+    }
+    const unit = el("text", { x: x0 - 6, y: G.top - 12, "text-anchor": "end", class: "ticklabel" }, ticks);
+    unit.textContent = "in";
+    // outline + shine
+    el("path", { d: tube, fill: "none", stroke: "var(--glass-edge)", "stroke-width": 2 }, svg);
+    el("rect", { x: x1 - 12, y: G.top, width: 4, height: G.bot - G.top - 10, rx: 2, fill: "#fff", opacity: 0.22 }, svg);
+    el("ellipse", { cx: x0 + r, cy: G.top - 8, rx: r + 6, ry: 5, fill: "var(--card)", stroke: "var(--glass-edge)", "stroke-width": 2 }, svg);
+
+    // markers, with labels nudged apart if they'd overlap
+    const marks = [];
+    if (g.full) marks.push({ v: g.full.avg, color: "var(--avg)", dash: "5 4", label: "avg " + fmt(g.full.avg) });
+    if (g.byNow && g.byNow.avg > 0 && (!g.full || Math.abs(g.byNow.avg - g.full.avg) > 0.005))
+      marks.push({ v: g.byNow.avg, color: "var(--norm)", dash: "", label: "normal " + fmt(g.byNow.avg) });
+    marks.sort((a, b) => b.v - a.v);
+    let prevY = -1e9;
+    for (const m of marks) {
+      const y = yOf(m.v);
+      let ly = Math.max(y, prevY + 13);
+      prevY = ly;
+      el("line", { x1: x0 - 3, x2: x1 + 6, y1: y, y2: y, stroke: m.color, "stroke-width": 2, "stroke-dasharray": m.dash }, svg);
+      if (Math.abs(ly - y) > 1) el("line", { x1: x1 + 6, x2: x1 + 10, y1: y, y2: ly, stroke: m.color, "stroke-width": 1 }, svg);
+      const t = el("text", { x: x1 + 12, y: ly + 3.5, fill: m.color, "font-size": 11, "font-weight": 600 }, svg);
+      t.textContent = m.label;
+    }
+    card.querySelector(".svgwrap").appendChild(svg);
+
+    const level = Math.min(g.total, sc.top);
+    return {
+      set(p) { // p: 0..1 fraction of the way to the current level
+        const y = yOf(level * p);
+        water.setAttribute("y", y);
+        water.setAttribute("height", Math.max(0, G.bot + 16 - y));
+        const amp = level > 0 ? 2.6 * (1 - p * 0.6) : 0, phase = performance.now() / 380;
+        let d = `M${x0 - 2},${y}`;
+        for (let x = x0 - 2; x <= x1 + 2; x += 4) d += ` L${x},${y + Math.sin(x / 7 + phase) * amp}`;
+        d += ` L${x1 + 2},${y + 6} L${x0 - 2},${y + 6} Z`;
+        wave.setAttribute("d", level > 0 ? d : "");
+        card.querySelector(".num").textContent = fmt(g.total * p);
+      }
+    };
+  }
+
+  function pctLine(g) {
+    if (!g.byNow || !(g.byNow.avg > 0.004)) return g.total > 0 ? "Wetter than usual for these days" : "Usually dry for these days";
+    const pct = Math.round(100 * g.total / g.byNow.avg);
+    return `${pct}% of normal so far`;
+  }
+
+  let animators = [], raf = 0;
+  function render(res, data, filledCount, stn) {
+    const wrap = document.getElementById("gauges");
+    wrap.innerHTML = "";
+    animators = res.gauges.map(g => {
+      const card = document.createElement("article");
+      card.className = "gauge";
+      card.title = "Click to refill";
+      card.innerHTML = `
+        <h2>${g.title}</h2>
+        <div class="range">${g.rangeLabel}</div>
+        <div class="svgwrap"></div>
+        <div class="total"><span class="num">0.00</span> <small>in</small></div>
+        <div class="stats">
+          ${g.full ? `<div><span class="sw"></span><span class="k">Average ${g.key === "year" ? "year" : g.key === "month" ? MONTHS[res.today.getMonth()] : "this week"}:</span> ${fmt(g.full.avg)} in</div>` : `<div class="k">No average available</div>`}
+          ${g.started ? `<div><span class="sw norm"></span><span class="k">Normal by ${nice(res.last)}:</span> ${fmt(g.byNow.avg)} in</div>` : ""}
+        </div>
+        <div class="pct">${pctLine(g)}</div>`;
+      card.addEventListener("click", play);
+      wrap.appendChild(card);
+      return drawGauge(card, g);
+    });
+    wrap.hidden = false;
+    document.getElementById("legend").hidden = false;
+    document.getElementById("status").hidden = true;
+    const yrs = res.gauges[0].full ? res.gauges[0].full.years : 0;
+    document.getElementById("sub").textContent =
+      `Rain and melted snow through ${res.last.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}`;
+    const lag = Math.round((res.today - res.last) / 864e5);
+    document.getElementById("foot").innerHTML =
+      `Station records via NOAA's ACIS service (data.rcc-acis.org). This year's totals come from ${stn.name} (${stn.sid}, ${stn.note}); ` +
+      `days it skipped are filled from the next station in the list` +
+      (filledCount ? ` (${filledCount} day${filledCount === 1 ? "" : "s"} this year).` : ".") +
+      ` Averages come from the long ${PRIMARY.name} record (${PRIMARY.sid}, gaps filled from ${BACKUP.name}), ${NORMAL_FROM}–${NORMAL_TO}, ${yrs} years for the annual figure; ` +
+      `the newer stations don't have 30 years of history. ` +
+      `“Normal by this date” is the average total for the same days in past years. Trace amounts count as zero.` +
+      (lag > 1 ? ` The newest report is ${lag} days old; stations post the previous day's rain each morning.` : "") +
+      (data.note ? `<br><strong>${data.note}</strong>` : "");
+    play();
+  }
+
+  function play() {
+    cancelAnimationFrame(raf);
+    const t0 = performance.now(), dur = 2200, stagger = 180;
+    const ease = t => 1 - Math.pow(1 - t, 3);
+    const frame = now => {
+      let running = false;
+      animators.forEach((a, i) => {
+        const t = Math.min(1, Math.max(0, (now - t0 - i * stagger) / dur));
+        if (t < 1) running = true;
+        a.set(ease(t));
+      });
+      // keep the surface gently moving for a little while after filling
+      if (running || now - t0 < dur + 2 * stagger + 1500) raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+  }
+
+  document.getElementById("replay").addEventListener("click", play);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && animators.length) play(); });
+  window.addEventListener("pageshow", e => { if (e.persisted && animators.length) play(); });
+
+  let DATA = null;
+  function show() {
+    const stn = chosenStation();
+    const norm = mergeChain([DATA.primary, DATA.backup]).map;
+    const order = [stn, ...CURRENT.filter(c => c !== stn)];
+    const since = `${new Date().getFullYear() - 1}-12-20`;
+    const { map, filled } = mergeChain(order.map(c => DATA.current[c.sid]), since);
+    const res = compute(map, filled, norm);
+    const year = String(res.today.getFullYear());
+    const filledCount = [...filled].filter(d => d.startsWith(year) && d <= iso(res.last)).length;
+    render(res, DATA, filledCount, stn);
+  }
+  const sel = document.getElementById("station");
+  CURRENT.forEach(c => { const o = document.createElement("option"); o.value = c.sid; o.textContent = `${c.name} (${c.short})`; sel.appendChild(o); });
+  sel.value = chosenStation().sid;
+  sel.addEventListener("change", () => { try { localStorage.setItem(STN_KEY, sel.value); } catch (e) {} if (DATA) show(); });
+
+  loadData().then(data => { DATA = data; show(); }).catch(e => {
+    const s = document.getElementById("status");
+    s.className = "status err";
+    s.textContent = `Couldn't load rain data: ${e.message}. Check the internet connection and reload.`;
+    document.getElementById("sub").textContent = "";
+  });
+})();
+</script>
+</body>
+</html>
