@@ -9,8 +9,8 @@ Use this when the user asks about frost dates, heat, wind, rainfall, chill hours
 planting windows, or "what will the weather be like" for a date or period in their garden.
 
 The garden is at about 1,800 ft up Squilchuck Road above Wenatchee, WA (Zone 7a-7b, about 9 in of rain a year,
-very dry hot summers). The nearest station is Pitcher Canyon (Weather Underground KWAWENAT11, 1,440 ft). If CSV
-exports from it are in `pws/Pitcher Canyon/`, always run with `--pws "pws/Pitcher Canyon"`.
+very dry hot summers). The nearest station is Pitcher Canyon (Weather Underground KWAWENAT11, 1,440 ft). If its
+monthly exports are in `Weatherunderground exports/`, always run with `--pws "Weatherunderground exports"`.
 Fruit trees and their chill needs and cold limits are listed in `fruit_trees.json`.
 
 ## Steps

@@ -1,3 +1,4 @@
 weather/data/
 __pycache__/
 .DS_Store
+weather/Weatherunderground exports/

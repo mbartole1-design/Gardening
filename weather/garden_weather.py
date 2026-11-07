@@ -875,8 +875,15 @@ def render(meta, res, et_src):
         w("")
         w(f"Based on {site['days']} days of your station's records ({site['first']} to {site['last']}). The long "
           f"{site['base_name'].title()} record has been shifted by these monthly differences to estimate {site['name']}'s "
-          "long-term climate, and your station's own readings are used directly where they exist. Rain is still the "
-          "town station's.")
+          "long-term climate, and your station's own readings are used directly where they exist.")
+        rr = site["offsets"].get("rain_ratio")
+        if rr:
+            w(f"Rain: {site['name']} caught {rr:.2f}× the town station's rain over the same days, so the long-term rain "
+              "totals are scaled by that.")
+        if site.get("high_only"):
+            w("")
+            w("**Only daily highs were in these files**, so nights, frost dates and chill still come from the town "
+              "station's lows. Heat, growing degree days and water loss reflect your station's highs.")
         w("")
         w("| Month | Days compared | Highs differ by °F | Lows differ by °F |")
         w("|---|---|---|---|")
@@ -884,9 +891,10 @@ def render(meta, res, et_src):
             o = site["offsets"][m]
             hi = o["hi"] if o["hi"] is not None else o.get("hi_fill")
             lo = o["lo"] if o["lo"] is not None else o.get("lo_fill")
-            tag = "" if o["hi"] is not None else " (borrowed from nearest month)"
-            w(f"| {MONTHS[m-1]} | {o['n']} | {fmt(hi, 1, '') if hi is None else f'{hi:+.1f}'}{tag} | "
-              f"{fmt(lo, 1, '') if lo is None else f'{lo:+.1f}'}{tag} |")
+            sh = "" if o["hi"] is not None or hi is None else " (from nearest month)"
+            sl = "" if o["lo"] is not None or lo is None else " (from nearest month)"
+            w(f"| {MONTHS[m-1]} | {o['n']} | {'n/a' if hi is None else f'{hi:+.1f}'}{sh} | "
+              f"{'n/a' if lo is None else f'{lo:+.1f}'}{sl} |")
         w("")
 
     w("## Recent years")
@@ -949,9 +957,14 @@ def main():
         for r in rows:  # use the personal station's own readings where it has them
             p = pws.get(r["date"])
             if p:
-                r["tmax"], r["tmin"] = p["tmax"], p["tmin"]
+                r["tmax"] = p["tmax"]
+                if p.get("tmin") is not None:
+                    r["tmin"] = p["tmin"]
+                if p.get("pcpn") is not None:
+                    r["pcpn"] = p["pcpn"]
         days = sorted(pws)
         meta["site"] = {"name": a.pws_name, "base_name": meta["name"], "offsets": offsets,
+                        "high_only": all(p.get("tmin") is None for p in pws.values()),
                         "days": len(days), "first": days[0], "last": days[-1]}
         meta["elev_ft"] = a.pws_elev
         print(f"Using {len(days)} days from {a.pws_name} ({days[0]} to {days[-1]})", file=sys.stderr)

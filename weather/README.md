@@ -30,7 +30,7 @@ python3 garden_weather.py --window 05-15 07-15   # add a custom window (e.g. the
 python3 garden_weather.py --station USW00094239  # Pangborn airport (East Wenatchee plateau) instead
 python3 garden_weather.py --years 20 --json      # 20-year climatology, plus a JSON summary
 python3 garden_weather.py --no-wind              # temperature-only water estimate
-python3 garden_weather.py --pws "pws/Pitcher Canyon"  # re-base everything on Pitcher Canyon exports
+python3 garden_weather.py --pws "Weatherunderground exports"  # re-base on Pitcher Canyon exports
 python3 garden_weather.py --help
 ```
 
@@ -38,20 +38,22 @@ Downloads are cached in `weather/data/` for a week; `--refresh` forces a new dow
 
 ## Using the Pitcher Canyon station (KWAWENAT11)
 
-Weather Underground doesn't offer a free download feed for other people's stations, but its website lets you
-export a station's history yourself:
+Weather Underground has no download feed for other people's stations, but the station dashboard's monthly
+history view can be exported one month at a time:
 
-1. Open https://www.wunderground.com/dashboard/pws/KWAWENAT11 and scroll to the history section.
-2. Choose **Table**, then **Monthly** (or **Custom** for a longer range), and click **Export CSV**.
-3. Save each file into `weather/pws/Pitcher Canyon/` (any file names). A year or more gives the best result,
-   and every month of the year should be covered at least once.
-4. Run `python3 garden_weather.py --pws "pws/Pitcher Canyon"`.
+1. Open https://www.wunderground.com/dashboard/pws/KWAWENAT11, go to the history section and pick a month.
+2. Export it. You get files named like `weather-history-2026-07-01.csv`.
+3. Save them all into `weather/Weatherunderground exports/` (Milan's copy lives in the Weather tool folder).
+   Note: this export has only each day's **high** temperature (plus dew point, humidity, wind, rain), not the low.
+4. Run `python3 garden_weather.py --pws "Weatherunderground exports"`.
 
 The tool compares the station with the long-record town station day by day, works out how much warmer or colder
 Pitcher Canyon's highs and lows run in each month, and shifts the 95-year town record by that amount. Where the
 station has its own readings, they're used directly. The report then shows frost dates, heat, water loss and chill
 for your site, plus a table of the monthly differences. The CSV reader accepts daily summaries (high/low columns) or
-individual observations (a single temperature column). Other stations work too: `--pws-name` and `--pws-elev` set
+individual observations (a single temperature column), and Weather Underground's monthly export (daily highs,
+°C or °F). With highs only, nights, frost dates and chill keep using the town station's lows, while rain is scaled
+by how much more the personal station catches. Other stations work too: `--pws-name` and `--pws-elev` set
 their name and elevation.
 
 ## Data sources (all free, no key needed)
