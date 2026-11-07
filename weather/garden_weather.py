@@ -952,7 +952,8 @@ def main():
         pws = pws_import.read_pws(a.pws)
         if not pws:
             sys.exit(f"No usable temperature data found in {a.pws}")
-        offsets = pws_import.monthly_offsets(pws, rows)
+        summary = pws_import.read_monthly_summary(a.pws)
+        offsets = pws_import.monthly_offsets(pws, rows, summary=summary)
         rows = pws_import.adjust_rows(rows, offsets)
         for r in rows:  # use the personal station's own readings where it has them
             p = pws.get(r["date"])
@@ -964,7 +965,8 @@ def main():
                     r["pcpn"] = p["pcpn"]
         days = sorted(pws)
         meta["site"] = {"name": a.pws_name, "base_name": meta["name"], "offsets": offsets,
-                        "high_only": all(p.get("tmin") is None for p in pws.values()),
+                        "high_only": all(p.get("tmin") is None for p in pws.values()) and not any(
+                            v.get("lo") is not None for v in summary.values()),
                         "days": len(days), "first": days[0], "last": days[-1]}
         meta["elev_ft"] = a.pws_elev
         print(f"Using {len(days)} days from {a.pws_name} ({days[0]} to {days[-1]})", file=sys.stderr)

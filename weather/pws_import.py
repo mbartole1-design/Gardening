@@ -130,7 +130,29 @@ def read_pws(folder):
     return daily
 
 
-def monthly_offsets(pws, base_rows, min_days=10):
+def read_monthly_summary(folder):
+    """Optional monthly_summary.csv in the folder: year,month,avg_low_f[,avg_high_f].
+
+    Used when daily exports lack lows (Weather Underground's monthly export): the station's monthly
+    average low, read off its monthly summary, still gives a per-month night-time offset.
+    """
+    path = os.path.join(folder, "monthly_summary.csv")
+    out = {}
+    if not os.path.exists(path):
+        return out
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        for r in csv.DictReader(f):
+            try:
+                key = (int(r["year"]), int(r["month"]))
+            except (KeyError, ValueError):
+                continue
+            lo = _temp_f(r.get("avg_low_f", ""))
+            hi = _temp_f(r.get("avg_high_f", ""))
+            out[key] = {"lo": lo, "hi": hi}
+    return out
+
+
+def monthly_offsets(pws, base_rows, min_days=10, summary=None):
     """Average (personal station - base station) difference in highs and lows, by month,
     plus the ratio of the two stations' rain over the days both reported."""
     base = {r["date"]: r for r in base_rows}
@@ -147,6 +169,14 @@ def monthly_offsets(pws, base_rows, min_days=10):
         if p.get("pcpn") is not None and b["pcpn"] is not None:
             rain_p += p["pcpn"]
             rain_b += b["pcpn"]
+    # monthly average lows from the station's summary, compared with the base station's same month
+    if summary:
+        for (y, m), v in summary.items():
+            if v.get("lo") is None or diffs[m]["lo"]:
+                continue
+            mins = [r["tmin"] for r in base_rows if r["date"].year == y and r["date"].month == m and r["tmin"] is not None]
+            if len(mins) >= 20:
+                diffs[m]["lo"] = [v["lo"] - statistics.mean(mins)] * min_days  # weight as a full month
     out = {}
     for m, v in diffs.items():
         out[m] = {"n_hi": len(v["hi"]), "n_lo": len(v["lo"]), "n": max(len(v["hi"]), len(v["lo"])),
