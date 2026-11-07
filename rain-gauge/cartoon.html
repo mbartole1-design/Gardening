@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rain Gauge Cartoon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fdf3dc;
+  --card: #ffffff;
+  --ink: #1d2340;
+  --muted: #5b6080;
+  --line: #1d2340;
+  --glass: #e9f6ff;
+  --water: #2e9cf4;
+  --water-top: #7cc8ff;
+  --avg: #ff7a3d;
+  --norm: #34c26b;
+  --cloud: #ffffff;
+  --sun: #ffcf3f;
+  --shadow: #1d2340;
+  --tick: #1d2340;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b2140; --card: #262d55; --ink: #f4f1ff; --muted: #b9bde0; --line: #0c0f22;
+    --glass: #33407a; --water: #3aa7ff; --water-top: #8fd2ff; --avg: #ff8d55; --norm: #4fd884;
+    --cloud: #e8ecff; --shadow: #0c0f22; --tick: #e8ecff;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1b2140; --card: #262d55; --ink: #f4f1ff; --muted: #b9bde0; --line: #0c0f22;
+  --glass: #33407a; --water: #3aa7ff; --water-top: #8fd2ff; --avg: #ff8d55; --norm: #4fd884;
+  --cloud: #e8ecff; --shadow: #0c0f22; --tick: #e8ecff;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 500 16px/1.4 "Fredoka", "Avenir Next Rounded", "Arial Rounded MT Bold", system-ui, sans-serif;
+  padding: 24px 16px 40px;
+  background-image: radial-gradient(color-mix(in srgb, var(--ink) 9%, transparent) 1.4px, transparent 1.6px);
+  background-size: 22px 22px;
+}
+main { max-width: 900px; margin: 0 auto; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+h1 {
+  font-size: 30px; font-weight: 700; margin: 0; letter-spacing: 0.01em;
+  display: inline-block; background: var(--sun); color: #1d2340; padding: 2px 14px 4px;
+  border: 3px solid var(--line); border-radius: 14px; box-shadow: 4px 4px 0 var(--shadow); transform: rotate(-1.5deg);
+}
+.sub { color: var(--muted); font-size: 14px; margin-top: 10px; }
+.controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+select, button {
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--card);
+  border: 3px solid var(--line); border-radius: 12px; padding: 5px 10px; cursor: pointer;
+  box-shadow: 3px 3px 0 var(--shadow); max-width: 100%;
+}
+button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--shadow); }
+.gauges { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.gauge {
+  background: var(--card); border: 3px solid var(--line); border-radius: 22px;
+  box-shadow: 6px 6px 0 var(--shadow);
+  padding: 14px 10px 16px; text-align: center; cursor: pointer;
+  opacity: 0; transform: translateY(30px) scale(0.96);
+}
+.gauge.in { animation: cardIn 600ms cubic-bezier(.34,1.56,.64,1) forwards; }
+@keyframes cardIn { to { opacity: 1; transform: none; } }
+.gauge h2 { font-size: 22px; font-weight: 700; margin: 0; }
+.gauge .range { color: var(--muted); font-size: 13px; }
+.svgwrap { margin-top: 14px; }
+.gauge svg { width: 100%; max-width: 240px; height: auto; display: block; margin: 0 auto; overflow: visible; }
+.total { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; margin-top: 2px; display: inline-block; }
+.total small { font-size: 18px; font-weight: 600; color: var(--muted); }
+.total.pop { animation: pop 450ms cubic-bezier(.34,1.56,.64,1); }
+@keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.25) rotate(-3deg); } 100% { transform: scale(1); } }
+.stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; font-size: 13px; }
+.chip { border: 2.5px solid var(--line); border-radius: 999px; padding: 2px 10px; font-weight: 600; color: #1d2340; }
+.chip.avg { background: var(--avg); }
+.chip.norm { background: var(--norm); }
+.pct {
+  margin: 12px auto 0; font-size: 15px; font-weight: 700; display: inline-block;
+  padding: 3px 12px; border-radius: 10px; border: 2.5px dashed var(--line);
+  opacity: 0; transform: scale(0.6);
+}
+.pct.show { animation: cardIn 500ms cubic-bezier(.34,1.56,.64,1) forwards; }
+.tick { stroke: var(--tick); stroke-linecap: round; }
+.ticklabel { fill: var(--ink); font: 600 11px "Fredoka", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.tag text { font: 700 12px "Fredoka", system-ui, sans-serif; fill: #1d2340; }
+.status { text-align: center; color: var(--muted); padding: 60px 0; font-size: 18px; }
+.status.err { color: var(--avg); }
+footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 22px; line-height: 1.5; }
+.legend { display: none; }
+@media (max-width: 640px) {
+  .gauges { grid-template-columns: 1fr; }
+  .gauge svg { max-width: 220px; }
+  h1 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gauge, .pct { opacity: 1; transform: none; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>How much rain?</h1>
+      <div class="sub" id="sub">Loading rain records…</div>
+    </div>
+    <div class="controls">
+      <label class="sub" for="station">Station</label>
+      <select id="station" title="Which station this year's rain comes from"></select>
+      <button id="replay" type="button" title="Run the fill animation again">Make it rain</button>
+    </div>
+  </header>
+  <div id="status" class="status">Fetching NOAA station data…</div>
+  <section class="gauges" id="gauges" hidden></section>
+  <div class="legend" id="legend" hidden>
+    <span><span class="sw"></span>Average for the whole period</span>
+    <span><span class="sw norm"></span>Normal by this date</span>
+    <span>Averages: 1996–2025</span>
+  </div>
+  <footer id="foot"></footer>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const ACIS = "https://data.rcc-acis.org/StnData";
+  // Long-record stations used for the 1996-2025 averages.
+  const PRIMARY = { sid: "USC00459074", name: "Wenatchee town" };
+  const BACKUP  = { sid: "USW00094239", name: "Pangborn airport" };
+  // Stations you can read this year's rain from. CoCoRaHS volunteers post each morning.
+  const CURRENT = [
+    { sid: "US1WACH0051", name: "Wenatchee 1.5 WSW", short: "1,050 ft", note: "CoCoRaHS, 1,050 ft, closest toward Squilchuck" },
+    { sid: "US1WACH0013", name: "Wenatchee 1.0 WSW", short: "900 ft", note: "CoCoRaHS, 900 ft" },
+    { sid: "USC00459074", name: "Wenatchee town", short: "626 ft", note: "NOAA co-op, 626 ft, same station as the averages" },
+    { sid: "USW00094239", name: "Pangborn airport", short: "1,238 ft", note: "NOAA, 1,238 ft, East Wenatchee plateau" }
+  ];
+  const STN_KEY = "rain-gauge-station";
+  const NORMAL_FROM = 1996, NORMAL_TO = 2025;
+  const CACHE_KEY = "rain-gauge-v2"; // shared with the plain version
+  const CACHE_FRESH_MS = 3 * 3600 * 1000;
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const MON = MONTHS.map(m => m.slice(0, 3));
+
+  // ---------- dates ----------
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const nice = d => `${MON[d.getMonth()]} ${d.getDate()}`;
+  function daysBetween(a, b) { // inclusive list
+    const out = [];
+    for (let d = a; d <= b; d = addDays(d, 1)) out.push(d);
+    return out;
+  }
+
+  // ---------- data ----------
+  function val(x) {
+    if (x == null || x === "M" || x === "S" || x === "") return null;
+    if (x === "T") return 0;
+    const v = parseFloat(String(x).replace(/A$/, ""));
+    return Number.isFinite(v) ? v : null;
+  }
+  async function fetchStation(sid, edate, sdate = `${NORMAL_FROM}-01-01`) {
+    const r = await fetch(ACIS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sid, sdate, edate, elems: [{ name: "pcpn" }] })
+    });
+    if (!r.ok) throw new Error(`NOAA returned ${r.status}`);
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    return j.data;
+  }
+  function readCache() {
+    try { const c = JSON.parse(localStorage.getItem(CACHE_KEY)); return c && c.primary ? c : null; }
+    catch (e) { return null; }
+  }
+  function writeCache(c) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch (e) {} }
+
+  async function loadData() {
+    const today = iso(new Date());
+    const cached = readCache();
+    if (cached && cached.day === today && Date.now() - cached.at < CACHE_FRESH_MS) return { ...cached, note: "" };
+    try {
+      const since = `${new Date().getFullYear() - 1}-12-20`;
+      const cocorahs = CURRENT.filter(c => c.sid !== PRIMARY.sid && c.sid !== BACKUP.sid);
+      const [primary, backup, ...cur] = await Promise.all([
+        fetchStation(PRIMARY.sid, today), fetchStation(BACKUP.sid, today),
+        ...cocorahs.map(c => fetchStation(c.sid, today, since).catch(() => []))
+      ]);
+      const current = {};
+      cocorahs.forEach((c, i) => { current[c.sid] = cur[i]; });
+      current[PRIMARY.sid] = primary; current[BACKUP.sid] = backup;
+      const c = { day: today, at: Date.now(), primary, backup, current };
+      writeCache(c);
+      return { ...c, note: "" };
+    } catch (e) {
+      if (cached) return { ...cached, note: `Couldn't reach NOAA (${e.message}); showing data saved ${new Date(cached.at).toLocaleString()}.` };
+      throw e;
+    }
+  }
+
+  // Merge station records in priority order; days missing from the first are filled from the next.
+  function mergeChain(series, fromDate) {
+    const map = new Map(), filled = new Set();
+    series.forEach((rows, i) => {
+      for (const [d, x] of rows || []) {
+        if (fromDate && d < fromDate) continue;
+        const v = val(x);
+        if (v == null || map.has(d)) continue;
+        map.set(d, v);
+        if (i > 0) filled.add(d);
+      }
+    });
+    return { map, filled };
+  }
+  function chosenStation() {
+    let sid = null;
+    try { sid = localStorage.getItem(STN_KEY); } catch (e) {}
+    return CURRENT.find(c => c.sid === sid) || CURRENT[0];
+  }
+
+  // Sum of a list of dates; null if too many are missing.
+  function sumDays(map, dates, tolerance) {
+    let s = 0, miss = 0;
+    for (const d of dates) { const v = map.get(iso(d)); if (v == null) miss++; else s += v; }
+    if (miss > Math.floor(dates.length * tolerance)) return null;
+    return miss ? s * dates.length / (dates.length - miss) : s;
+  }
+  // Average over the normal years of the same calendar span, shifted by year.
+  function normal(map, dates) {
+    const cy = dates[0].getFullYear(), sums = [];
+    for (let y = NORMAL_FROM; y <= NORMAL_TO; y++) {
+      const shifted = [];
+      for (const d of dates) {
+        const s = new Date(d.getFullYear() + (y - cy), d.getMonth(), d.getDate());
+        if (s.getMonth() === d.getMonth()) shifted.push(s); // skips Feb 29 in non-leap years
+      }
+      if (!shifted.length) continue;
+      const v = sumDays(map, shifted, dates.length >= 28 ? 0.1 : 0);
+      if (v != null) sums.push(v);
+    }
+    return sums.length ? { avg: sums.reduce((a, b) => a + b, 0) / sums.length, years: sums.length } : null;
+  }
+
+  function compute(map, filled, normMap) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let last = today;
+    for (let i = 0; i < 40 && map.get(iso(last)) == null; i++) last = addDays(last, -1);
+    const y0 = new Date(today.getFullYear(), 0, 1), y1 = new Date(today.getFullYear(), 11, 31);
+    const m0 = new Date(today.getFullYear(), today.getMonth(), 1), m1 = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const w0 = addDays(today, -today.getDay()), w1 = addDays(w0, 6); // Sunday to Saturday
+
+    function gauge(key, title, rangeLabel, start, end) {
+      const toDate = last >= start ? daysBetween(start, last) : [];
+      const total = toDate.reduce((s, d) => s + (map.get(iso(d)) ?? 0), 0);
+      const nFilled = toDate.filter(d => filled.has(iso(d))).length;
+      const full = normal(normMap, daysBetween(start, end));
+      const byNow = toDate.length ? normal(normMap, toDate) : { avg: 0 };
+      return { key, title, rangeLabel, total, full, byNow, nFilled, started: toDate.length > 0 };
+    }
+    return {
+      last, today,
+      gauges: [
+        gauge("year", `${today.getFullYear()}`, `Jan 1 – ${nice(last)}`, y0, y1),
+        gauge("month", MONTHS[today.getMonth()], `${nice(m0)} – ${nice(last < m0 ? m0 : last)}`, m0, m1),
+        gauge("week", "This week", `${nice(w0)} – ${nice(w1)} (Sun–Sat)`, w0, w1)
+      ]
+    };
+  }
+
+  // ---------- drawing (cartoon style) ----------
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs = {}, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const fmt = v => v >= 10 ? v.toFixed(1) : v.toFixed(2);
+  const clamp01 = t => Math.min(1, Math.max(0, t));
+  const easeOutBack = t => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+  const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const reduceMotion = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
+
+  function scaleFor(maxVal) {
+    const target = Math.max(maxVal * 1.15, 0.1);
+    const steps = [0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5];
+    let step = steps[steps.length - 1];
+    for (const s of steps) if (target / s <= 6) { step = s; break; }
+    const top = Math.ceil(target / step) * step;
+    const minor = step / (String(step).match(/^(2|0\.2|0\.02)/) ? 4 : 5);
+    return { top, step, minor };
+  }
+
+  const G = { w: 240, h: 372, tx: 78, tw: 66, top: 92, bot: 336 };
+  const FILL_MS = 2000, RAIN_MS = 700;
+  let uid = 0;
+  function drawGauge(card, g) {
+    const id = "g" + (uid++);
+    const maxVal = Math.max(g.total, g.full ? g.full.avg : 0, g.byNow ? g.byNow.avg : 0);
+    const sc = scaleFor(maxVal);
+    const yOf = v => G.bot - (v / sc.top) * (G.bot - G.top);
+    const svg = el("svg", { viewBox: `0 0 ${G.w} ${G.h}`, role: "img",
+      "aria-label": `${g.title}: ${fmt(g.total)} inches${g.full ? `, average ${fmt(g.full.avg)}` : ""}` });
+    const defs = el("defs", {}, svg);
+    const x0 = G.tx, x1 = G.tx + G.tw, cx = x0 + G.tw / 2, rb = 20;
+    const tube = `M${x0},${G.top - 12} L${x0},${G.bot - rb} Q${x0},${G.bot} ${x0 + rb},${G.bot} L${x1 - rb},${G.bot} Q${x1},${G.bot} ${x1},${G.bot - rb} L${x1},${G.top - 12} Z`;
+    el("path", { d: tube }, el("clipPath", { id: id + "c" }, defs));
+
+    // cloud with rain drops
+    const cloudG = el("g", {}, svg);
+    const cloud = el("g", {}, cloudG);
+    const cy = 34;
+    el("path", {
+      d: `M${cx - 46},${cy + 14} q-16,0 -16,-14 q0,-14 16,-14 q4,-18 24,-18 q12,-12 28,-4 q16,-6 26,8 q18,0 18,16 q0,14 -16,14 z`,
+      fill: "var(--cloud)", stroke: "var(--line)", "stroke-width": 3.5, "stroke-linejoin": "round"
+    }, cloud);
+    // little face
+    el("circle", { cx: cx - 10, cy: cy + 1, r: 2.6, fill: "#1d2340" }, cloud);
+    el("circle", { cx: cx + 10, cy: cy + 1, r: 2.6, fill: "#1d2340" }, cloud);
+    el("path", { d: `M${cx - 5},${cy + 6} q5,5 10,0`, fill: "none", stroke: "#1d2340", "stroke-width": 2.2, "stroke-linecap": "round" }, cloud);
+    const drops = [];
+    for (let i = 0; i < 5; i++) {
+      const d = el("path", { d: "M0,-9 C4,-3 6,1 6,4 A6,6 0 0 1 -6,4 C-6,1 -4,-3 0,-9 Z",
+        fill: "var(--water)", stroke: "var(--line)", "stroke-width": 2, opacity: 0 }, cloudG);
+      drops.push({ el: d, x: cx - 18 + i * 9, delay: i * 0.17 + (i % 2) * 0.08 });
+    }
+
+    // glass
+    el("path", { d: tube, fill: "var(--glass)" }, svg);
+    const wg = el("g", { "clip-path": `url(#${id}c)` }, svg);
+    const water = el("rect", { x: x0 - 4, width: G.tw + 8, y: G.bot + 4, height: 0, fill: "var(--water)" }, wg);
+    const band = el("path", { fill: "var(--water-top)" }, wg);
+    const surf = el("path", { fill: "none", stroke: "var(--line)", "stroke-width": 3, "stroke-linejoin": "round" }, wg);
+    const bubbles = [];
+    for (let i = 0; i < 6; i++) bubbles.push({
+      el: el("circle", { r: 2 + (i % 3), fill: "none", stroke: "#fff", "stroke-width": 2, opacity: 0.85 }, wg),
+      x: x0 + 12 + ((i * 37) % (G.tw - 24)), speed: 18 + (i * 13) % 22, off: i * 53
+    });
+    // ticks (on the glass, on top of water, like a printed scale)
+    const ticks = el("g", {}, svg);
+    for (let v = 0; v <= sc.top + 1e-9; v += sc.minor) {
+      const major = Math.abs(v / sc.step - Math.round(v / sc.step)) < 1e-6;
+      const y = yOf(v);
+      if (v > 0) el("line", { x1: x0 + 4, x2: x0 + (major ? 20 : 11), y1: y, y2: y, class: "tick", "stroke-width": major ? 3 : 2 }, ticks);
+      if (major) {
+        const t = el("text", { x: x0 - 8, y: y + 4, "text-anchor": "end", class: "ticklabel" }, ticks);
+        t.textContent = sc.step < 0.1 ? v.toFixed(2) : sc.step < 1 ? v.toFixed(sc.step === 0.25 ? 2 : 1) : v.toFixed(sc.step === 2.5 ? 1 : 0);
+      }
+    }
+    const unit = el("text", { x: x0 - 8, y: G.top - 16, "text-anchor": "end", class: "ticklabel" }, ticks);
+    unit.textContent = "inches";
+    // thick cartoon outline + shine + lip
+    el("path", { d: tube, fill: "none", stroke: "var(--line)", "stroke-width": 4.5, "stroke-linejoin": "round" }, svg);
+    el("rect", { x: x1 - 15, y: G.top + 6, width: 6, height: G.bot - G.top - 40, rx: 3, fill: "#fff", opacity: 0.55 }, svg);
+    el("rect", { x: x0 - 8, y: G.top - 18, width: G.tw + 16, height: 10, rx: 5, fill: "var(--card)", stroke: "var(--line)", "stroke-width": 3.5 }, svg);
+
+    // average / normal markers: a line across the glass plus a tag that pops in
+    const marks = [];
+    if (g.full) marks.push({ v: g.full.avg, color: "var(--avg)", dash: "7 5", label: "AVG " + fmt(g.full.avg) });
+    if (g.byNow && g.byNow.avg > 0 && (!g.full || Math.abs(g.byNow.avg - g.full.avg) > 0.005))
+      marks.push({ v: g.byNow.avg, color: "var(--norm)", dash: "", label: "NORMAL " + fmt(g.byNow.avg) });
+    marks.sort((a, b) => b.v - a.v);
+    let prevY = -1e9;
+    const tags = marks.map(m => {
+      const y = yOf(m.v);
+      const ly = Math.max(y, prevY + 26);
+      prevY = ly;
+      const line = el("line", { x1: x0 - 2, x2: x1 + 2, y1: y, y2: y, stroke: m.color, "stroke-width": 4,
+        "stroke-dasharray": m.dash, "stroke-linecap": "round", opacity: 0 }, svg);
+      const outer = el("g", { transform: `translate(${x1 + 8},${ly})` }, svg);
+      const tg = el("g", { class: "tag", transform: "scale(0)" }, outer);
+      if (Math.abs(ly - y) > 1) el("path", { d: `M-6,${y - ly} L2,0`, stroke: "var(--line)", "stroke-width": 2 }, tg);
+      const w = 10 + m.label.length * 7.1;
+      el("path", { d: `M0,0 L8,-11 L${w},-11 Q${w + 5},-11 ${w + 5},-6 L${w + 5},6 Q${w + 5},11 ${w},11 L8,11 Z`,
+        fill: m.color, stroke: "var(--line)", "stroke-width": 2.5, "stroke-linejoin": "round" }, tg);
+      const t = el("text", { x: 11, y: 4.5 }, tg);
+      t.textContent = m.label;
+      return { line, tg };
+    });
+    card.querySelector(".svgwrap").appendChild(svg);
+
+    const level = Math.min(g.total, sc.top);
+    const num = card.querySelector(".num"), totalEl = card.querySelector(".total"), pctEl = card.querySelector(".pct");
+    let popped = false;
+    return {
+      reset() {
+        popped = false; totalEl.classList.remove("pop"); pctEl.classList.remove("show");
+        card.classList.remove("in"); void card.offsetWidth; card.classList.add("in");
+      },
+      // ms: time since this gauge's animation started
+      set(ms, now) {
+        // 1. rain falls from the cloud
+        const rainT = ms / RAIN_MS;
+        drops.forEach(d => {
+          const t = rainT * 1.3 - d.delay;
+          const k = ((t % 1) + 1) % 1;
+          const active = level > 0 && t > 0 && ms < RAIN_MS + FILL_MS * 0.85;
+          const yEnd = Math.min(yOf(level), G.bot - 10);
+          d.el.setAttribute("opacity", active ? 1 : 0);
+          d.el.setAttribute("transform", `translate(${d.x},${58 + k * (yEnd - 58)}) scale(${0.8 + k * 0.3})`);
+        });
+        const bob = Math.sin(now / 420) * 2.5;
+        cloud.setAttribute("transform", `translate(0,${bob})`);
+        // 2. water fills with a little overshoot and slosh
+        const ft = clamp01((ms - RAIN_MS * 0.4) / FILL_MS);
+        const p = reduceMotion ? 1 : easeOutBack(ft);
+        const y = yOf(level * p);
+        water.setAttribute("y", y);
+        water.setAttribute("height", Math.max(0, G.bot + 4 - y));
+        const slosh = level > 0 ? (ft < 1 ? 5 * (1 - ft) + 1.5 : 1.5) : 0, ph = now / 260;
+        let top = "";
+        for (let x = x0 - 4; x <= x1 + 4; x += 3) top += `${x === x0 - 4 ? "M" : " L"}${x},${(y + Math.sin(x / 9 + ph) * slosh).toFixed(2)}`;
+        surf.setAttribute("d", level > 0 ? top : "");
+        band.setAttribute("d", level > 0 ? `${top} L${x1 + 4},${y + 9} L${x0 - 4},${y + 9} Z` : "");
+        bubbles.forEach(b => {
+          const span = Math.max(0, G.bot - y - 14);
+          const by = G.bot - 8 - ((now / 1000 * b.speed + b.off) % Math.max(span, 1));
+          b.el.setAttribute("cx", b.x + Math.sin(now / 300 + b.off) * 2);
+          b.el.setAttribute("cy", by);
+          b.el.setAttribute("opacity", span > 16 && ft > 0.1 ? 0.8 : 0);
+        });
+        num.textContent = fmt(g.total * Math.min(1, reduceMotion ? 1 : easeInOut(ft)));
+        // 3. markers and tags pop in as the water settles
+        tags.forEach((tg, i) => {
+          const tt = clamp01((ms - RAIN_MS * 0.4 - FILL_MS * 0.8 - i * 160) / 420);
+          tg.line.setAttribute("opacity", tt > 0 ? 1 : 0);
+          tg.tg.setAttribute("transform", `scale(${reduceMotion ? 1 : Math.max(0, easeOutBack(tt))})`);
+        });
+        if (ft >= 1 && !popped) { popped = true; totalEl.classList.add("pop"); pctEl.classList.add("show"); }
+      }
+    };
+  }
+
+  function pctLine(g) {
+    if (!g.byNow || !(g.byNow.avg > 0.004)) return g.total > 0 ? "Wetter than usual for these days" : "Usually dry for these days";
+    const pct = Math.round(100 * g.total / g.byNow.avg);
+    return `${pct}% of normal so far`;
+  }
+
+  let animators = [], raf = 0;
+  function render(res, data, filledCount, stn) {
+    const wrap = document.getElementById("gauges");
+    wrap.innerHTML = "";
+    animators = res.gauges.map(g => {
+      const card = document.createElement("article");
+      card.className = "gauge";
+      card.title = "Click to refill";
+      card.innerHTML = `
+        <h2>${g.title}</h2>
+        <div class="range">${g.rangeLabel}</div>
+        <div class="svgwrap"></div>
+        <div class="total"><span class="num">0.00</span> <small>in</small></div>
+        <div class="stats">
+          ${g.full ? `<span class="chip avg">Avg ${g.key === "year" ? "year" : g.key === "month" ? MONTHS[res.today.getMonth()] : "week"}: ${fmt(g.full.avg)} in</span>` : `<span class="chip">No average yet</span>`}
+          ${g.started && g.byNow && (!g.full || Math.abs(g.byNow.avg - g.full.avg) > 0.005) ? `<span class="chip norm">Normal by ${nice(res.last)}: ${fmt(g.byNow.avg)} in</span>` : ""}
+        </div>
+        <div><span class="pct">${pctLine(g)}</span></div>`;
+      card.addEventListener("click", play);
+      wrap.appendChild(card);
+      return drawGauge(card, g);
+    });
+    wrap.hidden = false;
+    document.getElementById("legend").hidden = false;
+    document.getElementById("status").hidden = true;
+    const yrs = res.gauges[0].full ? res.gauges[0].full.years : 0;
+    document.getElementById("sub").textContent =
+      `Rain and melted snow through ${res.last.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}`;
+    const lag = Math.round((res.today - res.last) / 864e5);
+    document.getElementById("foot").innerHTML =
+      `Station records via NOAA's ACIS service (data.rcc-acis.org). This year's totals come from ${stn.name} (${stn.sid}, ${stn.note}); ` +
+      `days it skipped are filled from the next station in the list` +
+      (filledCount ? ` (${filledCount} day${filledCount === 1 ? "" : "s"} this year).` : ".") +
+      ` Averages come from the long ${PRIMARY.name} record (${PRIMARY.sid}, gaps filled from ${BACKUP.name}), ${NORMAL_FROM}–${NORMAL_TO}, ${yrs} years for the annual figure; ` +
+      `the newer stations don't have 30 years of history. ` +
+      `“Normal by this date” is the average total for the same days in past years. Trace amounts count as zero.` +
+      (lag > 1 ? ` The newest report is ${lag} days old; stations post the previous day's rain each morning.` : "") +
+      (data.note ? `<br><strong>${data.note}</strong>` : "");
+    play();
+  }
+
+  function play() {
+    cancelAnimationFrame(raf);
+    const t0 = performance.now(), stagger = 260, total = RAIN_MS + FILL_MS + 2 * stagger + 1200;
+    animators.forEach(a => a.reset());
+    const frame = now => {
+      animators.forEach((a, i) => a.set(Math.max(0, now - t0 - i * stagger), now));
+      // the cloud bobs and bubbles drift for a while after filling, then everything rests
+      if (now - t0 < total + 6000) raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+  }
+
+  document.getElementById("replay").addEventListener("click", play);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && animators.length) play(); });
+  window.addEventListener("pageshow", e => { if (e.persisted && animators.length) play(); });
+
+  let DATA = null;
+  function show() {
+    const stn = chosenStation();
+    const norm = mergeChain([DATA.primary, DATA.backup]).map;
+    const order = [stn, ...CURRENT.filter(c => c !== stn)];
+    const since = `${new Date().getFullYear() - 1}-12-20`;
+    const { map, filled } = mergeChain(order.map(c => DATA.current[c.sid]), since);
+    const res = compute(map, filled, norm);
+    const year = String(res.today.getFullYear());
+    const filledCount = [...filled].filter(d => d.startsWith(year) && d <= iso(res.last)).length;
+    render(res, DATA, filledCount, stn);
+  }
+  const sel = document.getElementById("station");
+  CURRENT.forEach(c => { const o = document.createElement("option"); o.value = c.sid; o.textContent = `${c.name} (${c.short})`; sel.appendChild(o); });
+  sel.value = chosenStation().sid;
+  sel.addEventListener("change", () => { try { localStorage.setItem(STN_KEY, sel.value); } catch (e) {} if (DATA) show(); });
+
+  loadData().then(data => { DATA = data; show(); }).catch(e => {
+    const s = document.getElementById("status");
+    s.className = "status err";
+    s.textContent = `Couldn't load rain data: ${e.message}. Check the internet connection and reload.`;
+    document.getElementById("sub").textContent = "";
+  });
+})();
+</script>
+</body>
+</html>
