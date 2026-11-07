@@ -29,6 +29,12 @@ Tick **Pitcher Canyon alongside** to show a second tube in each card for Pitcher
 
 Days missing from the exports, and days after the last export, use the internet station picked in the menu. Keep `pitcher-canyon.js` in the same folder as the pages.
 
+## On claude.ai (desktop and iPhone)
+
+`artifact.html` is the cartoon page published as a Claude artifact: https://claude.ai/artifact/X1vWGNtjJXTxaDoeTH8euP
+
+Artifact pages can't reach NOAA themselves, so `build_artifact.py` embeds the 1996–2025 history, and the page reads two documents from its database: `rain/current` (this year, written every morning by a scheduled task running `refresh_artifact_data.py`) and `rain/pitcher` (the Pitcher Canyon bundle; Claude updates it after new exports).
+
 ## Open it
 
 Double-click `index.html` or `cartoon.html` (`Rain gauge.html` / `Rain gauge (cartoon).html` in the Mac folder). It opens in the default browser.
