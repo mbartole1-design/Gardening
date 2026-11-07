@@ -374,7 +374,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
   function pctLine(g, both) {
     const a = pctOf(g, g.total);
     if (a == null) return g.total > 0 ? "Wetter than usual for these days" : "Usually dry for these days";
-    if (both) return `${a}% of normal here, ${pctOf(g, g.pc.total)}% at Pitcher Canyon`;
+    if (both) return `${a}% of normal in town, ${pctOf(g, g.pc.total)}% at Pitcher Canyon`;
     return `${a}% of normal so far`;
   }
   function compareOn() {
