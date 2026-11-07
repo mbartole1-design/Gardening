@@ -1,6 +1,6 @@
 # Garden weather report: Wenatchee
 
-Station USC00459074 at 47.429, -120.310, elevation 626 ft. Records since 1931. Unless noted, numbers are based on the last 30 complete years (1996–2025), which reflect today's climate better than the full record. Generated 2026-11-06.
+Station USC00459074 at 47.429, -120.310, elevation 626 ft. Records since 1931. Unless noted, numbers are based on the last 30 complete years (1996–2025), which reflect today's climate better than the full record. Generated 2026-11-07.
 
 > Weather can't be forecast day-by-day more than about two weeks out. What this report gives you is the odds, based on what actually happened here in recent decades, which is the best guide for a plan a season ahead.
 
@@ -13,7 +13,8 @@ Station USC00459074 at 47.429, -120.310, elevation 626 ft. Records since 1931. U
 - **Lettuce and greens window closes** when daytime highs average 80°F+, typically **May 26** (early years May 15). It reopens around **Sep 23**, so sow fall greens from late Aug onward.
 - **Heat:** about **40 days ≥ 90°F**, **20 days ≥ 95°F** and **6 days ≥ 100°F** a year. First 90°F day is typically Jun 01.
 - **Rain:** about **8.7 in a year**, but only **1.0 in from June through September**. The typical longest dry spell (no day with 0.10 in or more, Apr–Oct) is **106 days**.
-- **Water:** plants lose roughly **24 in of water from June through September** (reference evapotranspiration), so almost all of it has to come from irrigation.
+- **Water:** plants lose roughly **27 in of water from June through September** (reference evapotranspiration), so almost all of it has to come from irrigation.
+- **Wind:** windiest months are Jun, Jul, May (about 10 mph average, with gusts of 35 mph or more on 35 days a year). Wind adds about **8.0 in** (30%) to June–September water loss compared with still air. A windbreak that halves wind speed would save roughly **4.3 in, about 270 gallons per 100 sq ft** over the summer.
 
 ## Frost dates
 
@@ -31,20 +32,43 @@ The date by which the last spring frost is behind you, and the first fall frost,
 
 | Month | Avg high °F | Avg low °F | Rain (in) | Days ≥90° | Days ≥100° | Frost nights | Water loss ET₀ (in) | Irrigation need (in) | Gal per 100 sq ft | Growing degree days |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Jan | 36 | 26 | 1.33 | 0.0 | 0.0 | 26 | 0.5 | 0.0 | 0 | 2 |
-| Feb | 43 | 27 | 0.97 | 0.0 | 0.0 | 23 | 1.0 | 0.3 | 19 | 12 |
-| Mar | 54 | 34 | 0.72 | 0.0 | 0.0 | 13 | 2.3 | 1.8 | 111 | 86 |
-| Apr | 64 | 40 | 0.46 | 0.0 | 0.0 | 2 | 3.8 | 3.4 | 214 | 203 |
-| May | 73 | 49 | 0.67 | 1.0 | 0.0 | 0 | 5.5 | 5.0 | 313 | 373 |
-| Jun | 80 | 56 | 0.43 | 4.4 | 0.7 | 0 | 6.4 | 6.1 | 378 | 523 |
-| Jul | 90 | 63 | 0.14 | 17.2 | 3.1 | 0 | 7.5 | 7.5 | 464 | 722 |
-| Aug | 89 | 62 | 0.19 | 14.1 | 2.1 | 0 | 6.4 | 6.3 | 393 | 701 |
-| Sep | 79 | 53 | 0.25 | 2.7 | 0.0 | 0 | 4.1 | 3.9 | 244 | 472 |
-| Oct | 63 | 42 | 0.73 | 0.0 | 0.0 | 2 | 2.1 | 1.6 | 100 | 209 |
-| Nov | 47 | 33 | 1.21 | 0.0 | 0.0 | 15 | 0.8 | 0.0 | 0 | 27 |
-| Dec | 36 | 27 | 1.64 | 0.0 | 0.0 | 25 | 0.4 | 0.0 | 0 | 2 |
+| Jan | 36 | 26 | 1.33 | 0.0 | 0.0 | 26 | 0.6 | 0.0 | 0 | 2 |
+| Feb | 43 | 27 | 0.97 | 0.0 | 0.0 | 23 | 1.1 | 0.4 | 26 | 12 |
+| Mar | 54 | 34 | 0.72 | 0.0 | 0.0 | 13 | 2.5 | 2.0 | 126 | 86 |
+| Apr | 64 | 40 | 0.46 | 0.0 | 0.0 | 2 | 4.1 | 3.8 | 236 | 203 |
+| May | 73 | 49 | 0.67 | 1.0 | 0.0 | 0 | 5.8 | 5.3 | 330 | 373 |
+| Jun | 80 | 56 | 0.43 | 4.4 | 0.7 | 0 | 6.8 | 6.5 | 403 | 523 |
+| Jul | 90 | 63 | 0.14 | 17.2 | 3.1 | 0 | 8.2 | 8.1 | 507 | 722 |
+| Aug | 89 | 62 | 0.19 | 14.1 | 2.1 | 0 | 7.1 | 7.0 | 434 | 701 |
+| Sep | 79 | 53 | 0.25 | 2.7 | 0.0 | 0 | 4.6 | 4.4 | 276 | 472 |
+| Oct | 63 | 42 | 0.73 | 0.0 | 0.0 | 2 | 2.4 | 1.9 | 117 | 209 |
+| Nov | 47 | 33 | 1.21 | 0.0 | 0.0 | 15 | 0.9 | 0.1 | 4 | 27 |
+| Dec | 36 | 27 | 1.64 | 0.0 | 0.0 | 25 | 0.5 | 0.0 | 0 | 2 |
 
-Water loss is reference evapotranspiration (ET₀) for a well-watered short grass, from the Hargreaves temperature-based estimate. Irrigation need is ET₀ minus the 70% of rain that is usefully absorbed. A full-grown tomato or squash uses about 1.0–1.1× ET₀ at peak; young transplants, garlic or onions near harvest, and mulched or drip-irrigated beds use noticeably less. Growing degree days use a 50°F base with an 86°F cap, the usual measure for tomatoes, peppers, squash and corn.
+Water loss is reference evapotranspiration (ET₀) for a well-watered short grass, from FAO-56 Penman-Monteith using this station's temperatures and measured airport wind (humidity and sunshine estimated from the daily temperature range). Irrigation need is ET₀ minus the 70% of rain that is usefully absorbed. A full-grown tomato or squash uses about 1.0–1.1× ET₀ at peak; young transplants, garlic or onions near harvest, and mulched or drip-irrigated beds use noticeably less. Growing degree days use a 50°F base with an 86°F cap, the usual measure for tomatoes, peppers, squash and corn.
+
+## Wind
+
+Daily wind at Pangborn airport, 2000–2025. The airport sits on the open plateau, so a sheltered valley yard will feel less, but the pattern by month and the direction of the strong winds hold.
+
+| Month | Avg wind (mph) | Avg daily peak gust (mph) | Windy days (avg ≥12 mph) | Gusts ≥35 mph (days) | Gusts ≥45 mph (days) | Strong winds from | Water loss from wind (in) | Saved by windbreak (gal per 100 sq ft) |
+|---|---|---|---|---|---|---|---|---|
+| Jan | 3.4 | 14 | 0.2 | 1.1 | 0.6 | NW | 0.2 | 11 |
+| Feb | 4.6 | 18 | 0.8 | 2.2 | 0.2 | W | 0.4 | 17 |
+| Mar | 6.7 | 23 | 2.4 | 3.9 | 0.6 | W | 0.8 | 29 |
+| Apr | 8.8 | 26 | 5.3 | 4.6 | 0.8 | NW | 1.2 | 38 |
+| May | 9.6 | 26 | 6.9 | 4.5 | 0.6 | NW | 1.4 | 46 |
+| Jun | 10.4 | 27 | 9.4 | 5.2 | 0.6 | NW | 1.7 | 55 |
+| Jul | 10.3 | 26 | 8.3 | 3.3 | 0.2 | NW | 2.4 | 79 |
+| Aug | 9.2 | 24 | 5.8 | 2.4 | 0.0 | NW | 2.3 | 77 |
+| Sep | 7.6 | 22 | 2.9 | 2.2 | 0.2 | NW | 1.7 | 59 |
+| Oct | 5.9 | 21 | 1.4 | 3.0 | 0.7 | W | 1.0 | 39 |
+| Nov | 4.3 | 17 | 0.7 | 1.5 | 0.4 | W | 0.4 | 19 |
+| Dec | 3.5 | 15 | 0.2 | 1.3 | 0.3 | NW | 0.2 | 11 |
+
+"Water loss from wind" is how much more water a fully planted bed loses than it would in near-still air. "Saved by windbreak" is what you would save if a fence, hedge or shade-cloth screen cut the wind in half. A windbreak protects a strip about 5 to 10 times its height downwind, so a 6 ft screen covers 30 to 60 ft. Put it on the side the strong winds come from.
+
+Wind also dries the soil surface and sprinkler spray long before roots get it, so drip or soaker lines under mulch and watering in the early morning, before the afternoon wind picks up, waste far less.
 
 ## Heat stress
 
@@ -65,8 +89,10 @@ Based on 29 years (1996–2025).
 - Days ≥ 90°F: 12.1. Days ≥ 95°F: 6.1. Days ≥ 100°F: 2.0 (at least one 100°F day in 59% of years).
 - Chance of a 32°F night in this window: 0%.
 - Rain: 0.90 in on average over 3.0 days, and only 0.07 in in a dry year (1-in-10).
-- Water loss (ET₀): 13.1 in. Water deficit to make up by irrigation: 12.2 in typical, 14.0 in in a hot dry year. That is about **759 gallons per 100 sq ft** of fully planted bed (875 in a hot year).
+- Water loss (ET₀): 14.0 in. Water deficit to make up by irrigation: 13.1 in typical, 15.4 in in a hot dry year. That is about **818 gallons per 100 sq ft** of fully planted bed (959 in a hot year).
 - Growing degree days accumulated: 1090.
+- Wind: 10.3 mph average, gusts of 35 mph or more on 9.6 days.
+- Wind's share of that water loss: 3.6 in. A windbreak that halves the wind would save about 117 gallons per 100 sq ft in this window.
 
 ## Recent years
 
@@ -88,4 +114,5 @@ Rain totals in years with gaps in the record will read a little low.
 ## Sources
 
 - Daily temperature and precipitation: NOAA cooperative and airport station records, via the Regional Climate Centers' ACIS service (data.rcc-acis.org).
-- Evapotranspiration: the Hargreaves temperature-based estimate.
+- Evapotranspiration: FAO-56 Penman-Monteith using this station's temperatures and measured airport wind (humidity and sunshine estimated from the daily temperature range).
+- Wind: NOAA GHCN-Daily average wind speed, peak gust and gust direction for Pangborn airport (USW00094239), via NCEI (www.ncei.noaa.gov).

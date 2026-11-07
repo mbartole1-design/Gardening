@@ -5,7 +5,9 @@ and turns it into numbers you can plan a garden with:
 
 - Frost-date odds at 36°F, 32°F and 28°F (typical date, and the 1-in-10 "late" or "early" date), plus how they have shifted since 1931
 - Month-by-month highs, lows, rain, 90°F/100°F days, frost nights and growing degree days
-- Water loss (evapotranspiration) and irrigation need per month, in inches and **gallons per 100 sq ft**
+- **Wind** by month: average speed, peak gusts, windy days, and the direction strong winds come from
+- Water loss (evapotranspiration) and irrigation need per month, in inches and **gallons per 100 sq ft**, with wind built in,
+  plus how much of it is caused by wind and how much a windbreak would save
 - Heat stress: hot days, warm nights that hurt fruit set, first/last 90°F day, heat streaks
 - Planting windows: when warm-season crops can go out, when lettuce stops and when it can start again
 - Any date window you choose (for example a trip: `--window 05-15 07-15`)
@@ -21,6 +23,7 @@ python3 garden_weather.py                        # writes reports/USC00459074_re
 python3 garden_weather.py --window 05-15 07-15   # add a custom window (e.g. the 2027 Croatia trip)
 python3 garden_weather.py --station USW00094239  # Pangborn airport (East Wenatchee plateau) instead
 python3 garden_weather.py --years 20 --json      # 20-year climatology, plus a JSON summary
+python3 garden_weather.py --no-wind              # temperature-only water estimate
 python3 garden_weather.py --help
 ```
 
@@ -31,9 +34,12 @@ Downloads are cached in `weather/data/` for a week; `--refresh` forces a new dow
 - **NOAA station records** via the Regional Climate Centers' ACIS service, `data.rcc-acis.org`.
   Nearby stations: `USC00459074` Wenatchee (626 ft, 1931–now), `USW00094239` Pangborn airport (1,238 ft, 1959–now).
   Any US station id works; find one at https://scacis.rcc-acis.org or with the ACIS `StnMeta` call.
-- **Open-Meteo history archive**, `archive-api.open-meteo.com`, for FAO-56 reference evapotranspiration.
-  If it is unreachable or rate-limited, the tool falls back to the Hargreaves estimate from the station's
-  own temperatures, which is usually within about 10% for this climate.
+- **NOAA GHCN-Daily wind** via NCEI, `www.ncei.noaa.gov`: daily average wind, peak gust and gust direction
+  for Pangborn airport (`USW00094239`, 2000–now). Water loss is computed with the FAO-56 Penman-Monteith
+  equation from the station's temperatures plus this measured wind. Use `--no-wind` to skip it
+  (temperature-only Hargreaves estimate) or `--wind-station` to pick another airport.
+- **Open-Meteo history archive** (optional, `--open-meteo`), `archive-api.open-meteo.com`, for gridded
+  FAO-56 evapotranspiration as a cross-check. It rate-limits heavily, so it is off by default.
 
 ## What it can and cannot predict
 

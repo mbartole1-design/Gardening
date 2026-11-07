@@ -36,11 +36,15 @@ DATA_DIR = os.path.join(HERE, "data")
 REPORT_DIR = os.path.join(HERE, "reports")
 
 DEFAULT_STATION = "USC00459074"  # WENATCHEE (in town, 626 ft, records since 1931)
+DEFAULT_WIND_STATION = "USW00094239"  # WENATCHEE PANGBORN AIRPORT (daily wind since 2000)
+NCEI_URL = "https://www.ncei.noaa.gov/access/services/data/v1"
 ACIS_URL = "https://data.rcc-acis.org"
 OPEN_METEO_URL = "https://archive-api.open-meteo.com/v1/archive"
 USER_AGENT = "garden-weather-tool/1.0"
 
 GAL_PER_INCH_PER_100SQFT = 62.3  # 1 inch of water over 100 sq ft
+COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+MPH_TO_MS = 0.44704
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
@@ -162,6 +166,43 @@ def load_et0(lat, lon, start_year, end_year, refresh=False):
     return out
 
 
+def load_wind(sid, refresh=False):
+    """Daily wind from NOAA GHCN-Daily (NCEI): {date: {"avg", "gust", "dir"}} in mph / degrees.
+
+    AWND = average daily wind speed, WSF5 = fastest 5-second gust, WDF2 = direction of the
+    fastest 2-minute wind. Airports (USW...) carry these; most co-op stations do not.
+    """
+    os.makedirs(DATA_DIR, exist_ok=True)
+    path = os.path.join(DATA_DIR, f"{sid}_wind.csv")
+    fresh = os.path.exists(path) and (
+        dt.datetime.now() - dt.datetime.fromtimestamp(os.path.getmtime(path))).days < 7
+    if refresh or not fresh:
+        q = urllib.parse.urlencode({
+            "dataset": "daily-summaries", "stations": sid, "startDate": "1980-01-01",
+            "endDate": dt.date.today().isoformat(), "dataTypes": "AWND,WSF2,WSF5,WDF2",
+            "units": "standard", "format": "csv"})
+        try:
+            req = urllib.request.Request(NCEI_URL + "?" + q, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                body = resp.read().decode()
+        except (urllib.error.URLError, TimeoutError) as e:
+            print(f"  (NOAA wind data unavailable: {e}; water loss will ignore wind)", file=sys.stderr)
+            if not os.path.exists(path):
+                return {}
+        else:
+            with open(path, "w") as f:
+                f.write(body)
+    out = {}
+    with open(path) as f:
+        for r in csv.DictReader(f):
+            g = lambda k: float(r[k]) if r.get(k, "").strip() else None
+            if g("AWND") is None:
+                continue
+            out[dt.date.fromisoformat(r["DATE"])] = {
+                "avg": g("AWND"), "gust": g("WSF5") or g("WSF2"), "dir": g("WDF2")}
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
@@ -225,6 +266,75 @@ def hargreaves_et0(tmax_f, tmin_f, date, lat_deg):
     return max(0.0, et_mm / 25.4)
 
 
+def _ra(date, lat_deg):
+    """Extraterrestrial radiation, MJ/m2/day (FAO-56 eq. 21)."""
+    j = date.timetuple().tm_yday
+    phi = math.radians(lat_deg)
+    dr = 1 + 0.033 * math.cos(2 * math.pi * j / 365)
+    delta = 0.409 * math.sin(2 * math.pi * j / 365 - 1.39)
+    ws = math.acos(max(-1, min(1, -math.tan(phi) * math.tan(delta))))
+    return (24 * 60 / math.pi) * 0.0820 * dr * (
+        ws * math.sin(phi) * math.sin(delta) + math.cos(phi) * math.cos(delta) * math.sin(ws))
+
+
+def penman_et0(tmax_f, tmin_f, date, lat_deg, elev_ft, wind_mph_10m):
+    """FAO-56 Penman-Monteith reference ET (inches/day) using measured wind.
+
+    Uses the FAO-56 procedures for missing humidity and radiation data: dew point is taken as
+    Tmin - 2°C (the arid-region adjustment) and solar radiation is estimated from the daily
+    temperature range (kRs = 0.16, interior location). Wind is the station's 24-hour average,
+    converted from the 10 m anemometer height to the 2 m standard.
+    """
+    if tmax_f is None or tmin_f is None or tmax_f < tmin_f or wind_mph_10m is None:
+        return None
+    tx, tn = (tmax_f - 32) / 1.8, (tmin_f - 32) / 1.8
+    t = (tx + tn) / 2
+    z = (elev_ft or 0) * 0.3048
+    e0 = lambda T: 0.6108 * math.exp(17.27 * T / (T + 237.3))
+    es = (e0(tx) + e0(tn)) / 2
+    ea = e0(tn - 2)
+    delta = 4098 * e0(t) / (t + 237.3) ** 2
+    gamma = 0.000665 * 101.3 * ((293 - 0.0065 * z) / 293) ** 5.26
+    ra = _ra(date, lat_deg)
+    rs = 0.16 * math.sqrt(tx - tn) * ra
+    rso = (0.75 + 2e-5 * z) * ra
+    rnl = 4.903e-9 * ((tx + 273.16) ** 4 + (tn + 273.16) ** 4) / 2 * (0.34 - 0.14 * math.sqrt(ea)) * (
+        1.35 * min(1.0, rs / rso if rso else 1) - 0.35)
+    rn = 0.77 * rs - rnl
+    u2 = wind_mph_10m * MPH_TO_MS * 4.87 / math.log(67.8 * 10 - 5.42)
+    et_mm = (0.408 * delta * rn + gamma * 900 / (t + 273) * u2 * (es - ea)) / (delta + gamma * (1 + 0.34 * u2))
+    return max(0.0, et_mm / 25.4)
+
+
+CALM_MPH = 1.5  # roughly the lightest breeze an exposed garden ever sees
+
+
+def build_et0(rows, wind, lat, elev_ft):
+    """Daily ET0 with wind, plus the same with calm air and with wind halved (a windbreak).
+
+    Days without a wind reading use that month's average wind, so years before the wind record
+    still get a wind-aware estimate.
+    """
+    by_month = {}
+    for d, w in wind.items():
+        by_month.setdefault(d.month, []).append(w["avg"])
+    month_avg = {m: statistics.mean(v) for m, v in by_month.items()}
+    et, calm, half = {}, {}, {}
+    for r in rows:
+        w = wind.get(r["date"], {}).get("avg") or month_avg.get(r["date"].month)
+        e = penman_et0(r["tmax"], r["tmin"], r["date"], lat, elev_ft, w)
+        if e is None:
+            continue
+        et[r["date"]] = e
+        calm[r["date"]] = penman_et0(r["tmax"], r["tmin"], r["date"], lat, elev_ft, CALM_MPH)
+        half[r["date"]] = penman_et0(r["tmax"], r["tmin"], r["date"], lat, elev_ft, w / 2)
+    return et, calm, half
+
+
+def compass(deg):
+    return None if deg is None else COMPASS[int(((deg % 360) + 22.5) // 45) % 8]
+
+
 def by_year(rows):
     out = {}
     for r in rows:
@@ -278,7 +388,10 @@ def rolling_first_last(days, key, threshold, window=7, above=True, after_doy=1):
     return first, last
 
 
-def analyze(rows, et0_daily, lat, clim_years, window=None):
+def analyze(rows, ets, lat, clim_years, window=None, wind=None):
+    """ets: {"et": {date: in}, optionally "calm" and "half"}; wind: from load_wind()."""
+    et0_daily = ets.get("et", {})
+    wind = wind or {}
     today = dt.date.today()
     last_full_year = today.year - 1
     years_all = {y: d for y, d in by_year(rows).items() if y <= last_full_year}
@@ -321,6 +434,7 @@ def analyze(rows, et0_daily, lat, clim_years, window=None):
         for r in mrows:
             per_year.setdefault(r["date"].year, []).append(r)
         rain_tot, d90, d95, d100, d32, et_tot, et_h_tot, gdd_tot = [], [], [], [], [], [], [], []
+        extra_tot = {}
         for y, rs in per_year.items():
             if sum(1 for r in rs if r["tmax"] is None) > 5:
                 continue
@@ -337,17 +451,39 @@ def analyze(rows, et0_daily, lat, clim_years, window=None):
             et = [et0_daily[r["date"]] for r in rs if r["date"] in et0_daily]
             if len(et) >= len(rs) - 2:
                 et_tot.append(sum(et))
+                for k in ("calm", "half"):
+                    if k in ets:
+                        extra_tot.setdefault(k, []).append(sum(ets[k].get(r["date"], 0) for r in rs))
+        # wind, from whatever wind years fall inside the climatology period
+        wd = [(d, v) for d, v in wind.items() if d.month == m and d.year in clim]
+        wyears = {}
+        for d, v in wd:
+            wyears.setdefault(d.year, []).append(v)
+        wyears = {y: v for y, v in wyears.items() if len(v) >= 25}
+        dirs = [compass(v["dir"]) for _, v in wd if v["gust"] and v["gust"] >= 25 and v["dir"] is not None]
+        wstats = {
+            "wind_avg": mean([v["avg"] for _, v in wd]),
+            "gust_avg": mean([v["gust"] for _, v in wd]),
+            "windy_days": mean([sum(1 for v in vs if v["avg"] >= 12) for vs in wyears.values()]),
+            "gust35_days": mean([sum(1 for v in vs if (v["gust"] or 0) >= 35) for vs in wyears.values()]),
+            "gust45_days": mean([sum(1 for v in vs if (v["gust"] or 0) >= 45) for vs in wyears.values()]),
+            "gust_max": max((v["gust"] or 0 for _, v in wd), default=None),
+            "strong_dir": max(set(dirs), key=dirs.count) if dirs else None,
+        }
         monthly.append({
+            **wstats,
             "month": MONTHS[m - 1],
             "hi": mean([r["tmax"] for r in mrows]), "lo": mean([r["tmin"] for r in mrows]),
             "rain": mean(rain_tot), "d90": mean(d90), "d95": mean(d95), "d100": mean(d100),
             "frost_nights": mean(d32), "gdd": mean(gdd_tot),
             "et0": mean(et_tot) if et_tot else mean(et_h_tot),
-            "et0_src": "Open-Meteo FAO-56" if et_tot else "Hargreaves (temp-based)",
+            "et0_calm": mean(extra_tot.get("calm", [])), "et0_half": mean(extra_tot.get("half", [])),
         })
     res["monthly"] = monthly
     res["annual_rain"] = sum(m["rain"] or 0 for m in monthly)
     res["summer_rain"] = sum(m["rain"] or 0 for m in monthly[5:9])
+    wind_years = sorted({d.year for d in wind if d.year in clim})
+    res["wind_period"] = (wind_years[0], wind_years[-1]) if wind_years else None
 
     # --- heat ---------------------------------------------------------------------
     heat_years = {}
@@ -418,7 +554,7 @@ def analyze(rows, et0_daily, lat, clim_years, window=None):
 
     # --- custom window ------------------------------------------------------------
     if window:
-        res["window"] = window_stats(clim, et0_daily, lat, window)
+        res["window"] = window_stats(clim, ets, lat, window, wind)
 
     # --- recent years table -----------------------------------------------------
     recent = []
@@ -440,7 +576,8 @@ def gdd50(r):
     return max(0.0, (hi + max(lo, 50)) / 2 - 50) if hi > 50 else 0.0
 
 
-def window_stats(clim, et0_daily, lat, window):
+def window_stats(clim, ets, lat, window, wind):
+    et0_daily = ets.get("et", {})
     (sm, sd), (em, ed) = window
     per = []
     for y, days in clim.items():
@@ -449,7 +586,12 @@ def window_stats(clim, et0_daily, lat, window):
             continue
         et = [et0_daily.get(r["date"]) or hargreaves_et0(r["tmax"], r["tmin"], r["date"], lat) or 0 for r in sel]
         rain = sum(r["pcpn"] or 0 for r in sel)
+        wsel = [wind[r["date"]] for r in sel if r["date"] in wind]
         per.append({
+            "wind": mean([v["avg"] for v in wsel]) if len(wsel) > 0.8 * len(sel) else None,
+            "gust35": sum(1 for v in wsel if (v["gust"] or 0) >= 35) if len(wsel) > 0.8 * len(sel) else None,
+            "wind_et": (sum(et) - sum(ets["calm"].get(r["date"], 0) for r in sel)) if "calm" in ets else None,
+            "half_save": (sum(et) - sum(ets["half"].get(r["date"], 0) for r in sel)) if "half" in ets else None,
             "hi": mean([r["tmax"] for r in sel]), "lo": mean([r["tmin"] for r in sel]),
             "d90": sum(1 for r in sel if (r["tmax"] or 0) >= 90),
             "d95": sum(1 for r in sel if (r["tmax"] or 0) >= 95),
@@ -469,6 +611,7 @@ def window_stats(clim, et0_daily, lat, window):
         "rain": agg("rain"), "rain_dry": agg("rain", 0.1), "rain_days": agg("rain_days"),
         "et0": agg("et0"), "deficit": agg("deficit"), "deficit_hot": agg("deficit", 0.9),
         "gdd": agg("gdd"), "max_med": agg("max", 0.5), "n": len(per),
+        "wind": agg("wind"), "gust35": agg("gust35"), "wind_et": agg("wind_et"), "half_save": agg("half_save"),
     }
 
 
@@ -517,6 +660,17 @@ def render(meta, res, et_src):
     summer_et = sum(m["et0"] or 0 for m in res["monthly"][5:9])
     w(f"- **Water:** plants lose roughly **{summer_et:.0f} in of water from June through September** "
       f"(reference evapotranspiration), so almost all of it has to come from irrigation.")
+    mo = res["monthly"]
+    if res.get("wind_period") and mo[6]["et0_calm"]:
+        summer_wind = sum((m["et0"] or 0) - (m["et0_calm"] or 0) for m in mo[5:9])
+        summer_half = sum((m["et0"] or 0) - (m["et0_half"] or 0) for m in mo[5:9])
+        windiest = sorted(mo, key=lambda m: m["wind_avg"] or 0, reverse=True)[:3]
+        w(f"- **Wind:** windiest months are {', '.join(m['month'] for m in windiest)} "
+          f"(about {windiest[0]['wind_avg']:.0f} mph average, with gusts of 35 mph or more on "
+          f"{sum(m['gust35_days'] or 0 for m in mo):.0f} days a year). Wind adds about **{summer_wind:.1f} in** "
+          f"({100 * summer_wind / summer_et:.0f}%) to June–September water loss compared with still air. "
+          f"A windbreak that halves wind speed would save roughly **{summer_half:.1f} in, about "
+          f"{summer_half * GAL_PER_INCH_PER_100SQFT:.0f} gallons per 100 sq ft** over the summer.")
     w("")
 
     w("## Frost dates")
@@ -555,6 +709,40 @@ def render(meta, res, et_src):
       "measure for tomatoes, peppers, squash and corn.")
     w("")
 
+    if res.get("wind_period"):
+        wp = res["wind_period"]
+        w("## Wind")
+        w("")
+        w(f"Daily wind at Pangborn airport, {wp[0]}–{wp[1]}. The airport sits on the open plateau, so a "
+          "sheltered valley yard will feel less, but the pattern by month and the direction of the strong winds hold.")
+        w("")
+        cal = bool(mo[6]["et0_calm"])
+        hdr = "| Month | Avg wind (mph) | Avg daily peak gust (mph) | Windy days (avg ≥12 mph) | Gusts ≥35 mph (days) | Gusts ≥45 mph (days) | Strong winds from |"
+        sep = "|---|---|---|---|---|---|---|"
+        if cal:
+            hdr += " Water loss from wind (in) | Saved by windbreak (gal per 100 sq ft) |"
+            sep += "---|---|"
+        w(hdr)
+        w(sep)
+        for m in mo:
+            line = (f"| {m['month']} | {fmt(m['wind_avg'], 1)} | {fmt(m['gust_avg'], 0)} | {fmt(m['windy_days'], 1)} | "
+                    f"{fmt(m['gust35_days'], 1)} | {fmt(m['gust45_days'], 1)} | {m['strong_dir'] or 'n/a'} |")
+            if cal:
+                we = (m["et0"] or 0) - (m["et0_calm"] or 0)
+                hs = (m["et0"] or 0) - (m["et0_half"] or 0)
+                line += f" {we:.1f} | {hs * GAL_PER_INCH_PER_100SQFT:.0f} |"
+            w(line)
+        w("")
+        if cal:
+            w("\"Water loss from wind\" is how much more water a fully planted bed loses than it would in near-still air. "
+              "\"Saved by windbreak\" is what you would save if a fence, hedge or shade-cloth screen cut the wind in half. "
+              "A windbreak protects a strip about 5 to 10 times its height downwind, so a 6 ft screen covers 30 to 60 ft. "
+              "Put it on the side the strong winds come from.")
+            w("")
+        w("Wind also dries the soil surface and sprinkler spray long before roots get it, so drip or soaker lines "
+          "under mulch and watering in the early morning, before the afternoon wind picks up, waste far less.")
+        w("")
+
     w("## Heat stress")
     w("")
     w(f"- Days ≥ 90°F: {fmt(h['d90'], 0)} a year now, vs {fmt(h['d90_early'], 0)} in {h['early_label']}.")
@@ -589,6 +777,11 @@ def render(meta, res, et_src):
           f"**{(x['deficit'] or 0) * GAL_PER_INCH_PER_100SQFT:.0f} gallons per 100 sq ft** of fully planted bed "
           f"({(x['deficit_hot'] or 0) * GAL_PER_INCH_PER_100SQFT:.0f} in a hot year).")
         w(f"- Growing degree days accumulated: {fmt(x['gdd'], 0)}.")
+        if x.get("wind") is not None:
+            w(f"- Wind: {fmt(x['wind'], 1)} mph average, gusts of 35 mph or more on {fmt(x['gust35'], 1)} days.")
+        if x.get("wind_et") is not None:
+            w(f"- Wind's share of that water loss: {fmt(x['wind_et'], 1)} in. A windbreak that halves the wind would "
+              f"save about {(x['half_save'] or 0) * GAL_PER_INCH_PER_100SQFT:.0f} gallons per 100 sq ft in this window.")
         w("")
 
     w("## Recent years")
@@ -606,6 +799,8 @@ def render(meta, res, et_src):
     w("- Daily temperature and precipitation: NOAA cooperative and airport station records, via the "
       "Regional Climate Centers' ACIS service (data.rcc-acis.org).")
     w(f"- Evapotranspiration: {et_src}.")
+    w("- Wind: NOAA GHCN-Daily average wind speed, peak gust and gust direction for Pangborn airport "
+      "(USW00094239), via NCEI (www.ncei.noaa.gov).")
     return "\n".join(L) + "\n"
 
 
@@ -623,7 +818,11 @@ def main():
                     help="Also summarize a date window, e.g. --window 05-15 07-15")
     ap.add_argument("--lat", type=float, help="Latitude for evapotranspiration (default: station)")
     ap.add_argument("--lon", type=float, help="Longitude for evapotranspiration (default: station)")
-    ap.add_argument("--no-et", action="store_true", help="Skip Open-Meteo; estimate ET from temperature")
+    ap.add_argument("--wind-station", default=DEFAULT_WIND_STATION,
+                    help="Station with daily wind (default USW00094239 Pangborn airport)")
+    ap.add_argument("--no-wind", action="store_true", help="Skip wind; estimate ET from temperature only")
+    ap.add_argument("--open-meteo", action="store_true",
+                    help="Use Open-Meteo's gridded ET0 instead of the station-based wind-aware estimate")
     ap.add_argument("--refresh", action="store_true", help="Re-download even if cached data is fresh")
     ap.add_argument("--out", help="Report path (default weather/reports/<station>_report.md)")
     ap.add_argument("--json", action="store_true", help="Also write a JSON summary next to the report")
@@ -635,16 +834,26 @@ def main():
     lat = a.lat if a.lat is not None else meta["lat"]
     lon = a.lon if a.lon is not None else meta["lon"]
     last_full = dt.date.today().year - 1
-    et0 = {}
-    if not a.no_et:
+    wind, ets = {}, {}
+    if not a.no_wind:
+        print(f"Fetching wind from NOAA ({a.wind_station}) ...", file=sys.stderr)
+        wind = load_wind(a.wind_station, a.refresh)
+    et_src = "the Hargreaves temperature-based estimate (wind not included)"
+    if a.open_meteo:
         print("Fetching evapotranspiration from Open-Meteo ...", file=sys.stderr)
-        et0 = load_et0(lat, lon, last_full - a.years + 1, last_full, a.refresh)
-    et_src = ("Open-Meteo history archive (FAO-56 Penman-Monteith from ERA5 reanalysis)" if et0
-              else "the Hargreaves temperature-based estimate")
+        om = load_et0(lat, lon, last_full - a.years + 1, last_full, a.refresh)
+        if om:
+            ets = {"et": om}
+            et_src = "the Open-Meteo history archive (FAO-56 Penman-Monteith from ERA5 reanalysis)"
+    if not ets and wind:
+        e, c, h = build_et0(rows, wind, lat, meta["elev_ft"])
+        ets = {"et": e, "calm": c, "half": h}
+        et_src = ("FAO-56 Penman-Monteith using this station's temperatures and measured airport wind "
+                  "(humidity and sunshine estimated from the daily temperature range)")
     window = (parse_md(a.window[0]), parse_md(a.window[1])) if a.window else None
 
     print("Analyzing ...", file=sys.stderr)
-    res = analyze(rows, et0, lat, a.years, window)
+    res = analyze(rows, ets, lat, a.years, window, wind)
     os.makedirs(REPORT_DIR, exist_ok=True)
     out = a.out or os.path.join(REPORT_DIR, f"{a.station}_report.md")
     with open(out, "w") as f:
