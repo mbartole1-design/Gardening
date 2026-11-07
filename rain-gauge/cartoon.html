@@ -340,11 +340,6 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     const water = el("rect", { x: x0 - 4, width: G.tw + 8, y: G.bot + 4, height: 0, fill: "var(--water)" }, wg);
     const band = el("path", { fill: "var(--water-top)" }, wg);
     const surf = el("path", { fill: "none", stroke: "var(--line)", "stroke-width": 3, "stroke-linejoin": "round" }, wg);
-    const bubbles = [];
-    for (let i = 0; i < 6; i++) bubbles.push({
-      el: el("circle", { r: 2 + (i % 3), fill: "none", stroke: "#fff", "stroke-width": 2, opacity: 0.85 }, wg),
-      x: x0 + 12 + ((i * 37) % (G.tw - 24)), speed: 18 + (i * 13) % 22, off: i * 53
-    });
     // ticks (on the glass, on top of water, like a printed scale)
     const ticks = el("g", {}, svg);
     for (let v = 0; v <= sc.top + 1e-9; v += sc.minor) {
@@ -421,13 +416,6 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
         for (let x = x0 - 4; x <= x1 + 4; x += 3) top += `${x === x0 - 4 ? "M" : " L"}${x},${(y + Math.sin(x / 9 + ph) * slosh).toFixed(2)}`;
         surf.setAttribute("d", level > 0 ? top : "");
         band.setAttribute("d", level > 0 ? `${top} L${x1 + 4},${y + 9} L${x0 - 4},${y + 9} Z` : "");
-        bubbles.forEach(b => {
-          const span = Math.max(0, G.bot - y - 14);
-          const by = G.bot - 8 - ((now / 1000 * b.speed + b.off) % Math.max(span, 1));
-          b.el.setAttribute("cx", b.x + Math.sin(now / 300 + b.off) * 2);
-          b.el.setAttribute("cy", by);
-          b.el.setAttribute("opacity", span > 16 && ft > 0.1 ? 0.8 : 0);
-        });
         num.textContent = fmt(g.total * Math.min(1, reduceMotion ? 1 : easeInOut(ft)));
         // 3. markers and tags pop in as the water settles
         tags.forEach((tg, i) => {
@@ -493,7 +481,7 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     animators.forEach(a => a.reset());
     const frame = now => {
       animators.forEach((a, i) => a.set(Math.max(0, now - t0 - i * stagger), now));
-      // the cloud bobs and bubbles drift for a while after filling, then everything rests
+      // the cloud bobs and the water ripples for a while after filling, then everything rests
       if (now - t0 < total + 6000) raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);

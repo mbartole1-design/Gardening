@@ -9,7 +9,7 @@ Each gauge marks:
 ## Two looks
 
 - `index.html`: plain, clean glass gauges.
-- `cartoon.html`: flat cartoon-explainer style with thick outlines, a rain cloud that drips into each gauge, a bouncy fill with bubbles, and tags that pop in. Same data and controls.
+- `cartoon.html`: flat cartoon-explainer style with thick outlines, a rain cloud that drips into each gauge, a bouncy fill, and tags that pop in. Same data and controls.
 
 ## Data
 
