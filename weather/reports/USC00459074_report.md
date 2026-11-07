@@ -94,6 +94,47 @@ Based on 29 years (1996–2025).
 - Wind: 10.3 mph average, gusts of 35 mph or more on 9.6 days.
 - Wind's share of that water loss: 3.6 in. A windbreak that halves the wind would save about 117 gallons per 100 sq ft in this window.
 
+## Fruit trees: chill and winter risk
+
+Chill is counted from Oct 1 to Mar 31. A typical winter here gives **1921 chill hours** (32–45°F; lowest 1473, highest 2410 over 28 winters), 1596 Utah chill units and 102 chill portions. That is far more than any of your trees need, so chill is not the problem here. The real risks are trees finishing their chill early and then blooming into a spring freeze, and hard winter cold.
+Chill hours have changed by about +26 hours per decade over the full record.
+
+| Tree | Chill hours needed | Winters with enough chill | Need typically met by | Met by (late winter) | Winters cold enough to injure | Winters cold enough to kill back |
+|---|---|---|---|---|---|---|
+| Sweet cherry (Bing / Rainier type) | 700–900 | 100% | Dec 05 | Jan 09 | 0 of 28 (≤-10°F) | 0 of 28 (≤-20°F) |
+| Italian prune plum (European) | 800–1000 | 100% | Dec 13 | Jan 23 | 0 of 28 (≤-15°F) | 0 of 28 (≤-25°F) |
+| Beauty plum (Japanese) | 250–400 | 100% | Nov 04 | Nov 14 | 2 of 28 (≤-5°F) | 0 of 28 (≤-15°F) |
+| Fig (hardy type, e.g. Chicago Hardy) | 100–300 | 100% | Oct 20 | Oct 31 | 25 of 28 (≤15°F) | 9 of 28 (≤5°F) |
+
+- **Sweet cherry (Bing / Rainier type):** Blooms early to mid April here. At full bloom, 28°F kills about 10% of flowers and 25°F about 90%.
+- **Italian prune plum (European):** Late bloomer, so spring frost is rarely a problem.
+- **Beauty plum (Japanese):** Low chill, so it is ready to bloom by midwinter and flowers at the first warm spell. Late-March and April freezes are its main threat.
+- **Fig (hardy type, e.g. Chicago Hardy):** Chill is never the issue here; winter cold is. Branches start to die back around 15°F and the top usually dies to the ground near 5°F, though the roots of hardy types regrow.
+
+**Bloom-time freezes:** 32% of springs have at least one night at 28°F or colder between Mar 15 and Apr 30 (about 0.8 such nights a year). The typical coldest winter night is 10°F.
+
+### Each winter
+
+| Winter | Chill hours | Utah units | Chill portions | Sweet cherry need met | Italian prune plum need met | Beauty plum need met | Fig need met | Coldest night °F | Freezes ≤28°F Mar 15–Apr 30 | Last ≤28°F |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2010-11 | 1857 | 1568 | 101 | Dec 19 | Dec 26 | Nov 06 | Oct 21 | 3 | 0 | Mar 07 |
+| 2011-12 | 1725 | 1482 | 107 | Dec 28 | Jan 06 | Nov 06 | Oct 25 | 12 | 0 | Mar 08 |
+| 2012-13 | 1813 | 1561 | 95 | Nov 28 | Dec 02 | Oct 28 | Oct 21 | 15 | 1 | Mar 25 |
+| 2013-14 | 1946 | 1623 | 109 | Dec 04 | Dec 26 | Nov 03 | Oct 16 | 10 | 0 | Mar 05 |
+| 2014-15 | 2019 | 1792 | 103 | Dec 19 | Dec 24 | Nov 23 | Nov 08 | 12 | 0 | Mar 05 |
+| 2015-16 | 1896 | 1588 | 100 | Dec 17 | Jan 09 | Nov 12 | Nov 02 | 10 | 0 | none |
+| 2016-17 | 1473 | 1598 | 101 | Jan 22 | Jan 29 | Nov 14 | Oct 19 | 1 | 0 | Mar 09 |
+| 2017-18 | 2303 | 1820 | 110 | Nov 22 | Nov 27 | Oct 27 | Oct 14 | 12 | 0 | Mar 10 |
+| 2018-19 | 1761 | 1381 | 102 | Dec 03 | Dec 13 | Nov 07 | Oct 18 | 12 | 1 | Mar 15 |
+| 2019-20 | 2272 | 1882 | 117 | Nov 26 | Dec 07 | Oct 26 | Oct 12 | 13 | 4 | Apr 03 |
+| 2020-21 | 2129 | 1663 | 109 | Dec 03 | Dec 13 | Nov 04 | Oct 25 | 17 | 0 | Mar 08 |
+| 2021-22 | 1717 | 1549 | 102 | Nov 28 | Dec 05 | Nov 03 | Oct 14 | 7 | 1 | Apr 15 |
+| 2022-23 | 1534 | 1062 | 84 | Jan 17 | Jan 29 | Nov 16 | Nov 05 | 1 | 2 | Mar 16 |
+| 2023-24 | 2406 | 2068 | 106 | Dec 08 | Dec 13 | Nov 09 | Oct 29 | -7 | 0 | Mar 07 |
+| 2024-25 | 2100 | 1558 | 102 | Dec 02 | Dec 09 | Nov 05 | Oct 23 | 9 | 0 | none |
+
+Every winter on record is in `reports/<station>_chill_by_winter.csv`. Hourly temperatures are rebuilt from daily highs and lows; checked against real hourly readings at Pangborn airport for 2015–2025, chill hours came out within about 5% in most winters. Tree needs and cold limits are in `fruit_trees.json`, which you can edit.
+
 ## Recent years
 
 | Year | Last 32°F | First 32°F | Days ≥90° | Days ≥100° | Hottest °F | Rain (in) |

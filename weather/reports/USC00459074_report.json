@@ -389,6 +389,80 @@
       "rain": 7.98
     }
   ],
+  "chill": {
+    "trees": [
+      {
+        "name": "Sweet cherry (Bing / Rainier type)",
+        "chill_hours_min": 700,
+        "chill_hours_max": 900,
+        "cold_damage_f": -10,
+        "cold_kill_f": -20,
+        "bloom_risk": "medium",
+        "notes": "Blooms early to mid April here. At full bloom, 28\u00b0F kills about 10% of flowers and 25\u00b0F about 90%.",
+        "pct_min": 100.0,
+        "pct_max": 100.0,
+        "met_med": "2026-12-05",
+        "met_late": "2027-01-09",
+        "damage_winters": 0,
+        "kill_winters": 0
+      },
+      {
+        "name": "Italian prune plum (European)",
+        "chill_hours_min": 800,
+        "chill_hours_max": 1000,
+        "cold_damage_f": -15,
+        "cold_kill_f": -25,
+        "bloom_risk": "low",
+        "notes": "Late bloomer, so spring frost is rarely a problem.",
+        "pct_min": 100.0,
+        "pct_max": 100.0,
+        "met_med": "2026-12-13",
+        "met_late": "2027-01-23",
+        "damage_winters": 0,
+        "kill_winters": 0
+      },
+      {
+        "name": "Beauty plum (Japanese)",
+        "chill_hours_min": 250,
+        "chill_hours_max": 400,
+        "cold_damage_f": -5,
+        "cold_kill_f": -15,
+        "bloom_risk": "high",
+        "notes": "Low chill, so it is ready to bloom by midwinter and flowers at the first warm spell. Late-March and April freezes are its main threat.",
+        "pct_min": 100.0,
+        "pct_max": 100.0,
+        "met_med": "2026-11-04",
+        "met_late": "2026-11-14",
+        "damage_winters": 2,
+        "kill_winters": 0
+      },
+      {
+        "name": "Fig (hardy type, e.g. Chicago Hardy)",
+        "chill_hours_min": 100,
+        "chill_hours_max": 300,
+        "cold_damage_f": 15,
+        "cold_kill_f": 5,
+        "bloom_risk": "none",
+        "notes": "Chill is never the issue here; winter cold is. Branches start to die back around 15\u00b0F and the top usually dies to the ground near 5\u00b0F, though the roots of hardy types regrow.",
+        "pct_min": 100.0,
+        "pct_max": 100.0,
+        "met_med": "2026-10-20",
+        "met_late": "2026-10-31",
+        "damage_winters": 25,
+        "kill_winters": 9
+      }
+    ],
+    "n": 28,
+    "ch_med": 1921.0,
+    "ch_low": 1473.0,
+    "ch_high": 2410.0,
+    "cp_med": 102.141329975657,
+    "utah_med": 1595.5,
+    "bloom_freeze_avg": 0.7857142857142857,
+    "bloom_freeze_pct": 32.142857142857146,
+    "coldest_med": 9.5,
+    "ch_trend": 25.740766099889687
+  },
   "frost": {
     "36": {
       "label": "36\u00b0F (light frost possible at ground level)",

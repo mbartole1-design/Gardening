@@ -1,0 +1,41 @@
+{
+  "_comment": "Edit this list to match your trees. chill_hours_min/max are nursery-style chill hour ratings (hours between 32 and 45 F, Oct 1 - Mar 31). cold_damage_f is the winter low that starts to injure wood or buds; cold_kill_f is where serious damage or top-kill is likely. bloom_risk says how exposed the bloom is to spring frost.",
+  "trees": [
+    {
+      "name": "Sweet cherry (Bing / Rainier type)",
+      "chill_hours_min": 700,
+      "chill_hours_max": 900,
+      "cold_damage_f": -10,
+      "cold_kill_f": -20,
+      "bloom_risk": "medium",
+      "notes": "Blooms early to mid April here. At full bloom, 28°F kills about 10% of flowers and 25°F about 90%."
+    },
+    {
+      "name": "Italian prune plum (European)",
+      "chill_hours_min": 800,
+      "chill_hours_max": 1000,
+      "cold_damage_f": -15,
+      "cold_kill_f": -25,
+      "bloom_risk": "low",
+      "notes": "Late bloomer, so spring frost is rarely a problem."
+    },
+    {
+      "name": "Beauty plum (Japanese)",
+      "chill_hours_min": 250,
+      "chill_hours_max": 400,
+      "cold_damage_f": -5,
+      "cold_kill_f": -15,
+      "bloom_risk": "high",
+      "notes": "Low chill, so it is ready to bloom by midwinter and flowers at the first warm spell. Late-March and April freezes are its main threat."
+    },
+    {
+      "name": "Fig (hardy type, e.g. Chicago Hardy)",
+      "chill_hours_min": 100,
+      "chill_hours_max": 300,
+      "cold_damage_f": 15,
+      "cold_kill_f": 5,
+      "bloom_risk": "none",
+      "notes": "Chill is never the issue here; winter cold is. Branches start to die back around 15°F and the top usually dies to the ground near 5°F, though the roots of hardy types regrow."
+    }
+  ]
+}

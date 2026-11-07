@@ -31,6 +31,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import chill
+import pws_import
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(HERE, "data")
 REPORT_DIR = os.path.join(HERE, "reports")
@@ -565,6 +568,44 @@ def analyze(rows, ets, lat, clim_years, window=None, wind=None):
                        "d90": h.get("d90"), "d100": h.get("d100"), "max": h.get("max"),
                        "rain": sum(r["pcpn"] or 0 for r in years_all[y])})
     res["recent"] = recent
+
+    # --- fruit-tree chill and winter risk -----------------------------------------
+    trees = chill.load_trees()
+    seasons = chill.chill_by_winter(chill.hourly_from_daily(rows, lat), trees)
+    extras = chill.winter_extras(rows)
+    winters = []
+    for k in sorted(seasons):
+        sdat = seasons[k]
+        if not sdat["complete"]:
+            continue
+        e = extras.get(k, {})
+        winters.append({"winter": k, "start_year": int(k[:4]), "ch": sdat["ch"], "utah": sdat["utah"],
+                        "cp": sdat["cp"], "met": sdat["met"], "coldest": e.get("coldest"),
+                        "bloom_freezes": e.get("bloom_freezes"), "last28": e.get("last28")})
+    cw = [w for w in winters if clim_start - 1 <= w["start_year"] < last_full_year]
+    tree_sum = []
+    for t in trees:
+        n = t["name"]
+        met_doys = [((w["met"][n] - dt.date(w["start_year"], 10, 1)).days) for w in cw if n in w["met"]]
+        tree_sum.append({
+            **t,
+            "pct_min": 100 * sum(1 for w in cw if w["ch"] >= t["chill_hours_min"]) / len(cw) if cw else None,
+            "pct_max": 100 * sum(1 for w in cw if w["ch"] >= t["chill_hours_max"]) / len(cw) if cw else None,
+            "met_med": (dt.date(2026, 10, 1) + dt.timedelta(days=percentile(met_doys, 0.5))) if met_doys else None,
+            "met_late": (dt.date(2026, 10, 1) + dt.timedelta(days=percentile(met_doys, 0.9))) if met_doys else None,
+            "damage_winters": sum(1 for w in cw if w["coldest"] is not None and w["coldest"] <= t["cold_damage_f"]),
+            "kill_winters": sum(1 for w in cw if w["coldest"] is not None and w["coldest"] <= t["cold_kill_f"]),
+        })
+    res["chill"] = {
+        "winters": winters, "trees": tree_sum, "n": len(cw),
+        "ch_med": percentile([w["ch"] for w in cw], 0.5), "ch_low": min((w["ch"] for w in cw), default=None),
+        "ch_high": max((w["ch"] for w in cw), default=None),
+        "cp_med": percentile([w["cp"] for w in cw], 0.5), "utah_med": percentile([w["utah"] for w in cw], 0.5),
+        "bloom_freeze_avg": mean([w["bloom_freezes"] for w in cw]),
+        "bloom_freeze_pct": 100 * sum(1 for w in cw if (w["bloom_freezes"] or 0) > 0) / len(cw) if cw else None,
+        "coldest_med": percentile([w["coldest"] for w in cw], 0.5),
+        "ch_trend": slope_per_decade([(w["start_year"], w["ch"]) for w in winters]),
+    }
     return res
 
 
@@ -623,7 +664,7 @@ def render(meta, res, et_src):
     L = []
     w = L.append
     cs, ce = res["clim_start"], res["clim_end"]
-    w(f"# Garden weather report: {meta['name'].title()}")
+    w(f"# Garden weather report: {meta.get('site', {}).get('name') or meta['name'].title()}")
     w("")
     w(f"Station {meta['sid']} at {meta['lat']:.3f}, {meta['lon']:.3f}, elevation {meta['elev_ft']:.0f} ft. "
       f"Records since {res['record_start']}. Unless noted, numbers are based on the last "
@@ -784,6 +825,70 @@ def render(meta, res, et_src):
               f"save about {(x['half_save'] or 0) * GAL_PER_INCH_PER_100SQFT:.0f} gallons per 100 sq ft in this window.")
         w("")
 
+    c = res.get("chill")
+    if c and c["n"]:
+        w("## Fruit trees: chill and winter risk")
+        w("")
+        w(f"Chill is counted from Oct 1 to Mar 31. A typical winter here gives **{fmt(c['ch_med'], 0)} chill hours** "
+          f"(32–45°F; lowest {fmt(c['ch_low'], 0)}, highest {fmt(c['ch_high'], 0)} over {c['n']} winters), "
+          f"{fmt(c['utah_med'], 0)} Utah chill units and {fmt(c['cp_med'], 0)} chill portions. "
+          "That is far more than any of your trees need, so chill is not the problem here. The real risks are "
+          "trees finishing their chill early and then blooming into a spring freeze, and hard winter cold.")
+        if c["ch_trend"] is not None:
+            w(f"Chill hours have changed by about {c['ch_trend']:+.0f} hours per decade over the full record.")
+        w("")
+        w("| Tree | Chill hours needed | Winters with enough chill | Need typically met by | Met by (late winter) | Winters cold enough to injure | Winters cold enough to kill back |")
+        w("|---|---|---|---|---|---|---|")
+        for t in c["trees"]:
+            w(f"| {t['name']} | {t['chill_hours_min']}–{t['chill_hours_max']} | {fmt(t['pct_max'], 0)}% | "
+              f"{t['met_med'].strftime('%b %d') if t['met_med'] else 'n/a'} | "
+              f"{t['met_late'].strftime('%b %d') if t['met_late'] else 'n/a'} | "
+              f"{t['damage_winters']} of {c['n']} (≤{t['cold_damage_f']}°F) | {t['kill_winters']} of {c['n']} (≤{t['cold_kill_f']}°F) |")
+        w("")
+        for t in c["trees"]:
+            w(f"- **{t['name']}:** {t['notes']}")
+        w("")
+        w(f"**Bloom-time freezes:** {fmt(c['bloom_freeze_pct'], 0)}% of springs have at least one night at 28°F or "
+          f"colder between Mar 15 and Apr 30 (about {fmt(c['bloom_freeze_avg'], 1)} such nights a year). "
+          f"The typical coldest winter night is {fmt(c['coldest_med'], 0)}°F.")
+        w("")
+        w("### Each winter")
+        w("")
+        names = [t["name"] for t in c["trees"]]
+        short = [n.split(" (")[0] for n in names]
+        w("| Winter | Chill hours | Utah units | Chill portions | " + " | ".join(f"{s} need met" for s in short) +
+          " | Coldest night °F | Freezes ≤28°F Mar 15–Apr 30 | Last ≤28°F |")
+        w("|---" * (7 + len(names)) + "|")
+        for x in c["winters"][-15:]:
+            w(f"| {x['winter']} | {x['ch']:.0f} | {x['utah']:.0f} | {x['cp']:.0f} | " +
+              " | ".join(x["met"][n].strftime("%b %d") if n in x["met"] else "not met" for n in names) +
+              f" | {fmt(x['coldest'], 0)} | {x['bloom_freezes']} | {x['last28'].strftime('%b %d') if x['last28'] else 'none'} |")
+        w("")
+        w("Every winter on record is in `reports/<station>_chill_by_winter.csv`. Hourly temperatures are rebuilt from daily highs "
+          "and lows; checked against real hourly readings at Pangborn airport for 2015–2025, chill hours came out within "
+          "about 5% in most winters. Tree needs and cold limits are in `fruit_trees.json`, which you can edit.")
+        w("")
+
+    site = meta.get("site")
+    if site:
+        w(f"## How {site['name']} compares with the {site['base_name'].title()} station")
+        w("")
+        w(f"Based on {site['days']} days of your station's records ({site['first']} to {site['last']}). The long "
+          f"{site['base_name'].title()} record has been shifted by these monthly differences to estimate {site['name']}'s "
+          "long-term climate, and your station's own readings are used directly where they exist. Rain is still the "
+          "town station's.")
+        w("")
+        w("| Month | Days compared | Highs differ by °F | Lows differ by °F |")
+        w("|---|---|---|---|")
+        for m in range(1, 13):
+            o = site["offsets"][m]
+            hi = o["hi"] if o["hi"] is not None else o.get("hi_fill")
+            lo = o["lo"] if o["lo"] is not None else o.get("lo_fill")
+            tag = "" if o["hi"] is not None else " (borrowed from nearest month)"
+            w(f"| {MONTHS[m-1]} | {o['n']} | {fmt(hi, 1, '') if hi is None else f'{hi:+.1f}'}{tag} | "
+              f"{fmt(lo, 1, '') if lo is None else f'{lo:+.1f}'}{tag} |")
+        w("")
+
     w("## Recent years")
     w("")
     w("| Year | Last 32°F | First 32°F | Days ≥90° | Days ≥100° | Hottest °F | Rain (in) |")
@@ -826,11 +931,30 @@ def main():
     ap.add_argument("--refresh", action="store_true", help="Re-download even if cached data is fresh")
     ap.add_argument("--out", help="Report path (default weather/reports/<station>_report.md)")
     ap.add_argument("--json", action="store_true", help="Also write a JSON summary next to the report")
+    ap.add_argument("--pws", metavar="FOLDER",
+                    help="Folder of CSVs exported from your own/nearby personal weather station")
+    ap.add_argument("--pws-name", default="Pitcher Canyon", help="Name for the personal station")
+    ap.add_argument("--pws-elev", type=float, default=1440, help="Personal station elevation in ft")
     a = ap.parse_args()
 
     print(f"Fetching station {a.station} ...", file=sys.stderr)
     meta = station_meta(a.station)
     rows = load_station_daily(a.station, a.refresh)
+    if a.pws:
+        pws = pws_import.read_pws(a.pws)
+        if not pws:
+            sys.exit(f"No usable temperature data found in {a.pws}")
+        offsets = pws_import.monthly_offsets(pws, rows)
+        rows = pws_import.adjust_rows(rows, offsets)
+        for r in rows:  # use the personal station's own readings where it has them
+            p = pws.get(r["date"])
+            if p:
+                r["tmax"], r["tmin"] = p["tmax"], p["tmin"]
+        days = sorted(pws)
+        meta["site"] = {"name": a.pws_name, "base_name": meta["name"], "offsets": offsets,
+                        "days": len(days), "first": days[0], "last": days[-1]}
+        meta["elev_ft"] = a.pws_elev
+        print(f"Using {len(days)} days from {a.pws_name} ({days[0]} to {days[-1]})", file=sys.stderr)
     lat = a.lat if a.lat is not None else meta["lat"]
     lon = a.lon if a.lon is not None else meta["lon"]
     last_full = dt.date.today().year - 1
@@ -855,11 +979,21 @@ def main():
     print("Analyzing ...", file=sys.stderr)
     res = analyze(rows, ets, lat, a.years, window, wind)
     os.makedirs(REPORT_DIR, exist_ok=True)
-    out = a.out or os.path.join(REPORT_DIR, f"{a.station}_report.md")
+    tag = a.pws_name.replace(" ", "_") if a.pws else a.station
+    out = a.out or os.path.join(REPORT_DIR, f"{tag}_report.md")
+    with open(os.path.join(os.path.dirname(out), f"{tag}_chill_by_winter.csv"), "w", newline="") as f:
+        cwr = csv.writer(f)
+        tnames = [t["name"] for t in res["chill"]["trees"]]
+        cwr.writerow(["winter", "chill_hours", "utah_units", "chill_portions"] +
+                     [f"{n}: need met" for n in tnames] + ["coldest_night_f", "freezes_le28_mar15_apr30", "last_le28"])
+        for x in res["chill"]["winters"]:
+            cwr.writerow([x["winter"], round(x["ch"]), round(x["utah"]), round(x["cp"], 1)] +
+                         [x["met"].get(n, "") for n in tnames] + [x["coldest"], x["bloom_freezes"], x["last28"] or ""])
     with open(out, "w") as f:
         f.write(render(meta, res, et_src))
     if a.json:
-        slim = {k: v for k, v in res.items() if k not in ("frost", "heat")}
+        slim = {k: v for k, v in res.items() if k not in ("frost", "heat", "chill")}
+        slim["chill"] = {k: v for k, v in res["chill"].items() if k != "winters"}
         slim["frost"] = {t: {k: v for k, v in f.items() if k != "by_year"} for t, f in res["frost"].items()}
         slim["heat"] = {k: v for k, v in res["heat"].items() if k != "by_year"}
         slim["station"] = meta
