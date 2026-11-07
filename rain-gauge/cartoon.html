@@ -320,13 +320,13 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     const cloud = el("g", {}, cloudG);
     const cy = 34;
     el("path", {
-      d: `M${cx - 46},${cy + 14} q-16,0 -16,-14 q0,-14 16,-14 q4,-18 24,-18 q12,-12 28,-4 q16,-6 26,8 q18,0 18,16 q0,14 -16,14 z`,
+      d: `M${cx - 46},${cy + 14} q-16,0 -16,-14 q0,-14 16,-14 q4,-18 24,-18 q12,-12 28,-4 q16,-6 26,8 q18,0 18,20 q0,22 -16,22 z`,
       fill: "var(--cloud)", stroke: "var(--line)", "stroke-width": 3.5, "stroke-linejoin": "round"
     }, cloud);
     // little face
-    el("circle", { cx: cx - 10, cy: cy + 1, r: 2.6, fill: "#1d2340" }, cloud);
-    el("circle", { cx: cx + 10, cy: cy + 1, r: 2.6, fill: "#1d2340" }, cloud);
-    el("path", { d: `M${cx - 5},${cy + 6} q5,5 10,0`, fill: "none", stroke: "#1d2340", "stroke-width": 2.2, "stroke-linecap": "round" }, cloud);
+    el("circle", { cx: cx - 10, cy: cy - 9, r: 2.8, fill: "#1d2340" }, cloud);
+    el("circle", { cx: cx + 10, cy: cy - 9, r: 2.8, fill: "#1d2340" }, cloud);
+    el("path", { d: `M${cx - 6},${cy - 3} q6,6 12,0`, fill: "none", stroke: "#1d2340", "stroke-width": 2.2, "stroke-linecap": "round" }, cloud);
     const drops = [];
     for (let i = 0; i < 5; i++) {
       const d = el("path", { d: "M0,-9 C4,-3 6,1 6,4 A6,6 0 0 1 -6,4 C-6,1 -4,-3 0,-9 Z",
