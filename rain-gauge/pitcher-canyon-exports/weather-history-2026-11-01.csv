@@ -1,0 +1,8 @@
+Time,Temperature,Dew Point,Humidity,Wind,Speed,Gust,Pressure,Precip. Rate,Precip. Accum.,UV,Solar
+11/1,14.7°C,4.7°C,86%,WNW,11.3km/h,11.3km/h,1023.74hPa,0mm,0mm,--,487w/m²
+11/2,11.9°C,3.8°C,79%,N,9.7km/h,9.7km/h,1029.43hPa,0mm,0mm,--,476w/m²
+11/3,12.2°C,5.8°C,88%,N,11.3km/h,11.3km/h,1026.96hPa,0mm,0mm,--,503w/m²
+11/4,13.2°C,5.5°C,93%,N,11.3km/h,11.3km/h,1022.76hPa,0mm,0.51mm,--,441w/m²
+11/5,12.4°C,8.2°C,94%,N,9.7km/h,9.7km/h,1025.77hPa,0mm,0mm,--,508w/m²
+11/6,9.8°C,7.9°C,95%,N,9.7km/h,9.7km/h,1025.7hPa,2.03mm,1.52mm,--,589w/m²
+11/7,7.7°C,6.2°C,96%,WNW,9.7km/h,9.7km/h,1023.67hPa,0mm,0mm,--,54w/m²

@@ -20,6 +20,15 @@ Free NOAA station records through the ACIS service (`data.rcc-acis.org`), fetche
 
 The Weather Underground station Pitcher Canyon (KWAWENAT11) is not used: its data is only available through a Weather Underground API key, which is issued to people who own a station.
 
+## Pitcher Canyon alongside
+
+Tick **Pitcher Canyon alongside** to show a second tube in each card for Pitcher Canyon (KWAWENAT11, about 1,800 ft, the closest station to the garden), on the same scale. Weather Underground only gives its data out as exports, so it's bundled:
+
+1. Export months from https://www.wunderground.com/dashboard/pws/KWAWENAT11 (History > Monthly > Export) into `pitcher-canyon-exports/`.
+2. Run `python3 build_pitcher.py` (or ask Claude), which rewrites `pitcher-canyon.js`.
+
+Days missing from the exports, and days after the last export, use the internet station picked in the menu. Keep `pitcher-canyon.js` in the same folder as the pages.
+
 ## Open it
 
 Double-click `index.html` or `cartoon.html` (`Rain gauge.html` / `Rain gauge (cartoon).html` in the Mac folder). It opens in the default browser.

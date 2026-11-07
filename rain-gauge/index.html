@@ -74,6 +74,13 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
   .gauges { grid-template-columns: 1fr; }
   .gauge svg { max-width: 200px; }
 }
+.pair { display: flex; align-items: flex-end; justify-content: center; gap: 4px; container-type: inline-size; }
+.pair .col { flex: none; }
+.pair svg { max-width: none !important; width: auto !important; height: calc(100cqw * var(--k)); }
+.pair .total { font-size: 24px; }
+.who { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 2px; line-height: 1.2; }
+.cmp { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
+.cmp input { width: 16px; height: 16px; accent-color: var(--water); }
 </style>
 </head>
 <body>
@@ -86,6 +93,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
     <div class="controls">
       <label class="sub" for="station">Station</label>
       <select id="station" title="Which station this year's rain comes from"></select>
+      <label class="cmp" id="cmpWrap" hidden><input type="checkbox" id="compare"> Pitcher Canyon alongside</label>
       <button id="replay" type="button" title="Run the fill animation again">Refill</button>
     </div>
   </header>
@@ -99,6 +107,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
   <footer id="foot"></footer>
 </main>
 
+<script src="pitcher-canyon.js"></script>
 <script>
 (() => {
   "use strict";
@@ -236,7 +245,17 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
       const nFilled = toDate.filter(d => filled.has(iso(d))).length;
       const full = normal(normMap, daysBetween(start, end));
       const byNow = toDate.length ? normal(normMap, toDate) : { avg: 0 };
-      return { key, title, rangeLabel, total, full, byNow, nFilled, started: toDate.length > 0 };
+      let pc = null;
+      const PC = window.PITCHER_CANYON;
+      if (PC && PC.days) {
+        let t = 0, fill = 0;
+        for (const d of toDate) {
+          const k = iso(d), v = PC.days[k];
+          if (v == null) { t += map.get(k) ?? 0; fill++; } else t += v;
+        }
+        pc = { total: t, filled: fill };
+      }
+      return { key, title, rangeLabel, total, full, byNow, nFilled, started: toDate.length > 0, pc };
     }
     return {
       last, today,
@@ -270,13 +289,16 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
 
   const G = { w: 220, h: 340, tx: 72, tw: 56, top: 26, bot: 318 };
   let uid = 0;
-  function drawGauge(card, g) {
+  // opt: value (inches to show, default g.total), maxVal (shared scale), wrap/num (where to draw), noTags
+  function drawGauge(card, g, opt = {}) {
+    const value = opt.value ?? g.total;
+    const wrapEl = opt.wrap || card.querySelector(".svgwrap"), numEl = opt.num || card.querySelector(".num");
     const id = "g" + (uid++);
-    const maxVal = Math.max(g.total, g.full ? g.full.avg : 0, g.byNow ? g.byNow.avg : 0);
+    const maxVal = opt.maxVal ?? Math.max(g.total, g.full ? g.full.avg : 0, g.byNow ? g.byNow.avg : 0);
     const sc = scaleFor(maxVal);
     const yOf = v => G.bot - (v / sc.top) * (G.bot - G.top);
-    const svg = el("svg", { viewBox: `0 0 ${G.w} ${G.h}`, role: "img",
-      "aria-label": `${g.title}: ${fmt(g.total)} inches${g.full ? `, average ${fmt(g.full.avg)}` : ""}` });
+    const svg = el("svg", { viewBox: `0 0 ${opt.noTags ? G.tx + G.tw + 14 : G.w} ${G.h}`, role: "img",
+      "aria-label": `${g.title}${opt.who ? " at " + opt.who : ""}: ${fmt(value)} inches${g.full ? `, average ${fmt(g.full.avg)}` : ""}` });
     const defs = el("defs", {}, svg);
     const r = G.tw / 2, x0 = G.tx, x1 = G.tx + G.tw;
     const tube = `M${x0},${G.top - 8} L${x0},${G.bot} Q${x0},${G.bot + 14} ${x0 + 12},${G.bot + 14} L${x1 - 12},${G.bot + 14} Q${x1},${G.bot + 14} ${x1},${G.bot} L${x1},${G.top - 8} Z`;
@@ -322,13 +344,14 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
       let ly = Math.max(y, prevY + 13);
       prevY = ly;
       el("line", { x1: x0 - 3, x2: x1 + 6, y1: y, y2: y, stroke: m.color, "stroke-width": 2, "stroke-dasharray": m.dash }, svg);
-      if (Math.abs(ly - y) > 1) el("line", { x1: x1 + 6, x2: x1 + 10, y1: y, y2: ly, stroke: m.color, "stroke-width": 1 }, svg);
+      if (!opt.noTags && Math.abs(ly - y) > 1) el("line", { x1: x1 + 6, x2: x1 + 10, y1: y, y2: ly, stroke: m.color, "stroke-width": 1 }, svg);
       const t = el("text", { x: x1 + 12, y: ly + 3.5, fill: m.color, "font-size": 11, "font-weight": 600 }, svg);
       t.textContent = m.label;
+      if (opt.noTags) t.setAttribute("display", "none");
     }
-    card.querySelector(".svgwrap").appendChild(svg);
+    wrapEl.appendChild(svg);
 
-    const level = Math.min(g.total, sc.top);
+    const level = Math.min(value, sc.top);
     return {
       set(p) { // p: 0..1 fraction of the way to the current level
         const y = yOf(level * p);
@@ -339,19 +362,30 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
         for (let x = x0 - 2; x <= x1 + 2; x += 4) d += ` L${x},${y + Math.sin(x / 7 + phase) * amp}`;
         d += ` L${x1 + 2},${y + 6} L${x0 - 2},${y + 6} Z`;
         wave.setAttribute("d", level > 0 ? d : "");
-        card.querySelector(".num").textContent = fmt(g.total * p);
+        numEl.textContent = fmt(value * p);
       }
     };
   }
 
-  function pctLine(g) {
-    if (!g.byNow || !(g.byNow.avg > 0.004)) return g.total > 0 ? "Wetter than usual for these days" : "Usually dry for these days";
-    const pct = Math.round(100 * g.total / g.byNow.avg);
-    return `${pct}% of normal so far`;
+  function pctOf(g, v) {
+    if (!g.byNow || !(g.byNow.avg > 0.004)) return null;
+    return Math.round(100 * v / g.byNow.avg);
+  }
+  function pctLine(g, both) {
+    const a = pctOf(g, g.total);
+    if (a == null) return g.total > 0 ? "Wetter than usual for these days" : "Usually dry for these days";
+    if (both) return `${a}% of normal here, ${pctOf(g, g.pc.total)}% at Pitcher Canyon`;
+    return `${a}% of normal so far`;
+  }
+  function compareOn() {
+    let v = null;
+    try { v = localStorage.getItem("rain-gauge-compare"); } catch (e) {}
+    return v !== "0";
   }
 
   let animators = [], raf = 0;
   function render(res, data, filledCount, stn) {
+    const cmp = !!(window.PITCHER_CANYON && compareOn());
     const wrap = document.getElementById("gauges");
     wrap.innerHTML = "";
     animators = res.gauges.map(g => {
@@ -361,17 +395,29 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
       card.innerHTML = `
         <h2>${g.title}</h2>
         <div class="range">${g.rangeLabel}</div>
-        <div class="svgwrap"></div>
-        <div class="total"><span class="num">0.00</span> <small>in</small></div>
+        ${cmp && g.pc ? `<div class="pair" style="--k:${G.h / (G.tx + G.tw + 14 + G.w + 8)}">
+          <div class="col"><div class="svgwrap sa"></div>
+            <div class="who">${stn.name}</div><div class="total"><span class="num na">0.00</span> <small>in</small></div></div>
+          <div class="col"><div class="svgwrap sb"></div>
+            <div class="who">Pitcher Canyon</div><div class="total"><span class="num nb">0.00</span> <small>in</small></div></div>
+        </div>` : `<div class="svgwrap"></div>
+        <div class="total"><span class="num">0.00</span> <small>in</small></div>`}
         <div class="stats">
           ${g.full ? `<div><span class="sw"></span><span class="k">Average ${g.key === "year" ? "year" : g.key === "month" ? MONTHS[res.today.getMonth()] : "this week"}:</span> ${fmt(g.full.avg)} in</div>` : `<div class="k">No average available</div>`}
           ${g.started ? `<div><span class="sw norm"></span><span class="k">Normal by ${nice(res.last)}:</span> ${fmt(g.byNow.avg)} in</div>` : ""}
         </div>
-        <div class="pct">${pctLine(g)}</div>`;
+        <div class="pct">${pctLine(g, cmp && g.pc)}</div>`;
       card.addEventListener("click", play);
       wrap.appendChild(card);
-      return drawGauge(card, g);
-    });
+      if (cmp && g.pc) {
+        const maxVal = Math.max(g.total, g.pc.total, g.full ? g.full.avg : 0, g.byNow ? g.byNow.avg : 0);
+        return [
+          drawGauge(card, g, { maxVal, noTags: true, who: stn.name, wrap: card.querySelector(".sa"), num: card.querySelector(".na") }),
+          drawGauge(card, g, { maxVal, value: g.pc.total, who: "Pitcher Canyon", wrap: card.querySelector(".sb"), num: card.querySelector(".nb") })
+        ];
+      }
+      return [drawGauge(card, g)];
+    }).flat();
     wrap.hidden = false;
     document.getElementById("legend").hidden = false;
     document.getElementById("status").hidden = true;
@@ -387,6 +433,11 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
       `the newer stations don't have 30 years of history. ` +
       `“Normal by this date” is the average total for the same days in past years. Trace amounts count as zero.` +
       (lag > 1 ? ` The newest report is ${lag} days old; stations post the previous day's rain each morning.` : "") +
+      (cmp ? `<br>Pitcher Canyon (KWAWENAT11, ${window.PITCHER_CANYON.elev}) comes from your Weather Underground exports, ` +
+        `${nice(parse(window.PITCHER_CANYON.first))}, ${window.PITCHER_CANYON.first.slice(0, 4)} to ${nice(parse(window.PITCHER_CANYON.last))} (the last day may be partial). ` +
+        `Days missing from the exports, and days after the last export, use ${stn.name}` +
+        (() => { const f = res.gauges[0].pc ? res.gauges[0].pc.filled : 0; return f ? ` (${f} day${f === 1 ? "" : "s"} this year).` : "."; })() +
+        ` To update it, export new months into the pitcher-canyon-exports folder and ask Claude to rebuild, or run build_pitcher.py.` : "") +
       (data.note ? `<br><strong>${data.note}</strong>` : "");
     play();
   }
@@ -423,6 +474,12 @@ footer { color: var(--muted); font-size: 12px; margin-top: 18px; line-height: 1.
     const year = String(res.today.getFullYear());
     const filledCount = [...filled].filter(d => d.startsWith(year) && d <= iso(res.last)).length;
     render(res, DATA, filledCount, stn);
+  }
+  const cmpBox = document.getElementById("compare");
+  if (window.PITCHER_CANYON) {
+    document.getElementById("cmpWrap").hidden = false;
+    cmpBox.checked = compareOn();
+    cmpBox.addEventListener("change", () => { try { localStorage.setItem("rain-gauge-compare", cmpBox.checked ? "1" : "0"); } catch (e) {} if (DATA) show(); });
   }
   const sel = document.getElementById("station");
   CURRENT.forEach(c => { const o = document.createElement("option"); o.value = c.sid; o.textContent = `${c.name} (${c.short})`; sel.appendChild(o); });
