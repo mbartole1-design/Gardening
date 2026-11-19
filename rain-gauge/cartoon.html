@@ -22,18 +22,21 @@
   --sun: #ffcf3f;
   --shadow: #1d2340;
   --tick: #1d2340;
+  --snow: #ffffff;
+  --snow-top: #f3f8ff;
+  --glass-snow: #c7dcf0;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #1b2140; --card: #262d55; --ink: #f4f1ff; --muted: #b9bde0; --line: #0c0f22;
     --glass: #33407a; --water: #3aa7ff; --water-top: #8fd2ff; --avg: #ff8d55; --norm: #4fd884;
-    --cloud: #e8ecff; --shadow: #0c0f22; --tick: #e8ecff;
+    --cloud: #e8ecff; --shadow: #0c0f22; --tick: #e8ecff; --snow: #eef3ff; --snow-top: #ffffff; --glass-snow: #33407a;
   }
 }
 :root[data-theme="dark"] {
   --bg: #1b2140; --card: #262d55; --ink: #f4f1ff; --muted: #b9bde0; --line: #0c0f22;
   --glass: #33407a; --water: #3aa7ff; --water-top: #8fd2ff; --avg: #ff8d55; --norm: #4fd884;
-  --cloud: #e8ecff; --shadow: #0c0f22; --tick: #e8ecff;
+  --cloud: #e8ecff; --shadow: #0c0f22; --tick: #e8ecff; --snow: #eef3ff; --snow-top: #ffffff; --glass-snow: #33407a;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -109,16 +112,25 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
 .who { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 2px; line-height: 1.2; }
 .cmp { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
 .cmp input { width: 16px; height: 16px; accent-color: var(--water); }
+body.snow { --water: var(--snow); --water-top: var(--snow-top); --glass: var(--glass-snow); }
+.mode { display: inline-flex; border: 3px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 3px 3px 0 var(--shadow); }
+.mode button { border: 0; border-radius: 0; box-shadow: none; padding: 5px 14px; }
+.mode button + button { border-left: 3px solid var(--line); }
+.mode button[aria-pressed="true"] { background: var(--sun); color: #1d2340; }
+.mode button:active { transform: none; }
+.depth { display: inline-block; margin-top: 8px; font-weight: 600; font-size: 14px; }
 </style>
 </head>
 <body>
 <main>
   <header>
     <div>
-      <h1>How much rain?</h1>
+      <h1 id="title">How much rain?</h1>
       <div class="sub" id="sub">Loading rain records…</div>
+      <div class="depth" id="depth" hidden></div>
     </div>
     <div class="controls">
+      <div class="mode" role="group" aria-label="Rain or snow"><button type="button" id="mRain" aria-pressed="true">Rain</button><button type="button" id="mSnow" aria-pressed="false">Snow</button></div>
       <label class="sub" for="station">Station</label>
       <select id="station" title="Which station this year's rain comes from"></select>
       <label class="cmp" id="cmpWrap" hidden><input type="checkbox" id="compare"> Pitcher Canyon alongside</label>
@@ -152,7 +164,9 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
   ];
   const STN_KEY = "rain-gauge-station";
   const NORMAL_FROM = 1996, NORMAL_TO = 2025;
-  const CACHE_KEY = "rain-gauge-v2"; // shared with the plain version
+  const CACHE_KEY = "rain-gauge-v3";
+  const MODE_KEY = "rain-gauge-mode";
+  let MODE = (() => { try { return localStorage.getItem(MODE_KEY) === "snow" ? "snow" : "rain"; } catch (e) { return "rain"; } })(); // shared with the plain version
   const CACHE_FRESH_MS = 3 * 3600 * 1000;
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const MON = MONTHS.map(m => m.slice(0, 3));
@@ -175,11 +189,11 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     const v = parseFloat(String(x).replace(/A$/, ""));
     return Number.isFinite(v) ? v : null;
   }
-  async function fetchStation(sid, edate, sdate = `${NORMAL_FROM}-01-01`) {
+  async function fetchStation(sid, edate, sdate = `${NORMAL_FROM - 1}-07-01`) {
     const r = await fetch(ACIS, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sid, sdate, edate, elems: [{ name: "pcpn" }] })
+      body: JSON.stringify({ sid, sdate, edate, elems: [{ name: "pcpn" }, { name: "snow" }, { name: "snwd" }] })
     });
     if (!r.ok) throw new Error(`NOAA returned ${r.status}`);
     const j = await r.json();
@@ -197,7 +211,7 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     const cached = readCache();
     if (cached && cached.day === today && Date.now() - cached.at < CACHE_FRESH_MS) return { ...cached, note: "" };
     try {
-      const since = `${new Date().getFullYear() - 1}-12-20`;
+      const since = `${new Date().getFullYear() - 1}-06-20`;
       const cocorahs = CURRENT.filter(c => c.sid !== PRIMARY.sid && c.sid !== BACKUP.sid);
       const [primary, backup, ...cur] = await Promise.all([
         fetchStation(PRIMARY.sid, today), fetchStation(BACKUP.sid, today),
@@ -216,10 +230,12 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
   }
 
   // Merge station records in priority order; days missing from the first are filled from the next.
-  function mergeChain(series, fromDate) {
+  // col: 1 rain (water), 2 new snowfall, 3 snow depth
+  function mergeChain(series, fromDate, col = 1) {
     const map = new Map(), filled = new Set();
     series.forEach((rows, i) => {
-      for (const [d, x] of rows || []) {
+      for (const r of rows || []) {
+        const d = r[0], x = r[col];
         if (fromDate && d < fromDate) continue;
         const v = val(x);
         if (v == null || map.has(d)) continue;
@@ -243,9 +259,9 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     return miss ? s * dates.length / (dates.length - miss) : s;
   }
   // Average over the normal years of the same calendar span, shifted by year.
-  function normal(map, dates) {
+  function normal(map, dates, from = NORMAL_FROM, to = NORMAL_TO) {
     const cy = dates[0].getFullYear(), sums = [];
-    for (let y = NORMAL_FROM; y <= NORMAL_TO; y++) {
+    for (let y = from; y <= to; y++) {
       const shifted = [];
       for (const d of dates) {
         const s = new Date(d.getFullYear() + (y - cy), d.getMonth(), d.getDate());
@@ -263,7 +279,11 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     let last = today;
     for (let i = 0; i < 40 && map.get(iso(last)) == null; i++) last = addDays(last, -1);
-    const y0 = new Date(today.getFullYear(), 0, 1), y1 = new Date(today.getFullYear(), 11, 31);
+    const snow = MODE === "snow";
+    // snow is counted by season, July 1 to June 30
+    const sy = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1;
+    const y0 = snow ? new Date(sy, 6, 1) : new Date(today.getFullYear(), 0, 1);
+    const y1 = snow ? new Date(sy + 1, 5, 30) : new Date(today.getFullYear(), 11, 31);
     const m0 = new Date(today.getFullYear(), today.getMonth(), 1), m1 = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     const w0 = addDays(today, -today.getDay()), w1 = addDays(w0, 6); // Sunday to Saturday
 
@@ -271,11 +291,13 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
       const toDate = last >= start ? daysBetween(start, last) : [];
       const total = toDate.reduce((s, d) => s + (map.get(iso(d)) ?? 0), 0);
       const nFilled = toDate.filter(d => filled.has(iso(d))).length;
-      const full = normal(normMap, daysBetween(start, end));
-      const byNow = toDate.length ? normal(normMap, toDate) : { avg: 0 };
+      // a snow season starting in year y needs Jan-Jun of y+1, so its normals are the 1995-96 to 2024-25 seasons
+      const [nf, nt] = snow && key === "year" ? [NORMAL_FROM - 1, NORMAL_TO - 1] : [NORMAL_FROM, NORMAL_TO];
+      const full = normal(normMap, daysBetween(start, end), nf, nt);
+      const byNow = toDate.length ? normal(normMap, toDate, nf, nt) : { avg: 0 };
       let pc = null;
       const PC = window.PITCHER_CANYON;
-      if (PC && PC.days) {
+      if (PC && PC.days && !snow) {
         let t = 0, fill = 0;
         for (const d of toDate) {
           const k = iso(d), v = PC.days[k];
@@ -288,7 +310,8 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     return {
       last, today,
       gauges: [
-        gauge("year", `${today.getFullYear()}`, `Jan 1 – ${nice(last)}`, y0, y1),
+        snow ? gauge("year", `${sy}–${String(sy + 1).slice(2)} season`, `Jul 1 – ${nice(last)}`, y0, y1)
+             : gauge("year", `${today.getFullYear()}`, `Jan 1 – ${nice(last)}`, y0, y1),
         gauge("month", MONTHS[today.getMonth()], `${nice(m0)} – ${nice(last < m0 ? m0 : last)}`, m0, m1),
         gauge("week", "This week", `${nice(w0)} – ${nice(w1)} (Sun–Sat)`, w0, w1)
       ]
@@ -303,7 +326,7 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     if (parent) parent.appendChild(e);
     return e;
   };
-  const fmt = v => v >= 10 ? v.toFixed(1) : v.toFixed(2);
+  const fmt = v => MODE === "snow" || v >= 10 ? v.toFixed(1) : v.toFixed(2);
   const clamp01 = t => Math.min(1, Math.max(0, t));
   const easeOutBack = t => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
   const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -311,7 +334,7 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
 
   function scaleFor(maxVal) {
     const target = Math.max(maxVal * 1.15, 0.1);
-    const steps = [0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5];
+    const steps = [0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10];
     let step = steps[steps.length - 1];
     for (const s of steps) if (target / s <= 6) { step = s; break; }
     const top = Math.ceil(target / step) * step;
@@ -351,8 +374,15 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     el("path", { d: `M${cx - 6},${cy - 3} q6,6 12,0`, fill: "none", stroke: "#1d2340", "stroke-width": 2.2, "stroke-linecap": "round" }, cloud);
     const drops = [];
     for (let i = 0; i < 5; i++) {
-      const d = el("path", { d: "M0,-9 C4,-3 6,1 6,4 A6,6 0 0 1 -6,4 C-6,1 -4,-3 0,-9 Z",
-        fill: "var(--water)", stroke: "var(--line)", "stroke-width": 2, opacity: 0 }, cloudG);
+      let d;
+      if (MODE === "snow") {
+        d = el("g", { opacity: 0 }, cloudG);
+        for (const a of [0, 60, 120]) el("line", { x1: 0, y1: -6, x2: 0, y2: 6, transform: `rotate(${a})`, stroke: "var(--line)", "stroke-width": 2.2, "stroke-linecap": "round" }, d);
+        el("circle", { r: 2.2, fill: "#ffffff", stroke: "var(--line)", "stroke-width": 1.4 }, d);
+      } else {
+        d = el("path", { d: "M0,-9 C4,-3 6,1 6,4 A6,6 0 0 1 -6,4 C-6,1 -4,-3 0,-9 Z",
+          fill: "var(--water)", stroke: "var(--line)", "stroke-width": 2, opacity: 0 }, cloudG);
+      }
       drops.push({ el: d, x: cx - 18 + i * 9, delay: i * 0.17 + (i % 2) * 0.08 });
     }
 
@@ -424,7 +454,8 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
           const active = level > 0 && t > 0 && ms < RAIN_MS + FILL_MS * 0.85;
           const yEnd = Math.min(yOf(level), G.bot - 10);
           d.el.setAttribute("opacity", active ? 1 : 0);
-          d.el.setAttribute("transform", `translate(${d.x},${58 + k * (yEnd - 58)}) scale(${0.8 + k * 0.3})`);
+          const drift = MODE === "snow" ? Math.sin(now / 280 + d.delay * 12) * 5 : 0;
+          d.el.setAttribute("transform", `translate(${d.x + drift},${58 + k * (yEnd - 58)}) ${MODE === "snow" ? `rotate(${(now / 8 + d.delay * 90) % 360})` : `scale(${0.8 + k * 0.3})`}`);
         });
         const bob = Math.sin(now / 420) * 2.5;
         cloud.setAttribute("transform", `translate(0,${bob})`);
@@ -457,7 +488,7 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
   }
   function pctLine(g, both) {
     const a = pctOf(g, g.total);
-    if (a == null) return g.total > 0 ? "Wetter than usual for these days" : "Usually dry for these days";
+    if (a == null) return MODE === "snow" ? (g.total > 0 ? "More snow than usual for these days" : "Usually no snow yet") : (g.total > 0 ? "Wetter than usual for these days" : "Usually dry for these days");
     if (both) return `${a}% of normal in town, ${pctOf(g, g.pc.total)}% at Pitcher Canyon`;
     return `${a}% of normal so far`;
   }
@@ -469,7 +500,7 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
 
   let animators = [], raf = 0;
   function render(res, data, filledCount, stn) {
-    const cmp = !!(window.PITCHER_CANYON && compareOn());
+    const cmp = !!(window.PITCHER_CANYON && compareOn() && MODE === "rain");
     const wrap = document.getElementById("gauges");
     wrap.innerHTML = "";
     animators = res.gauges.map(g => {
@@ -487,7 +518,7 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
         </div>` : `<div class="svgwrap"></div>
         <div class="total"><span class="num">0.00</span> <small>in</small></div>`}
         <div class="stats">
-          ${g.full ? `<span class="chip avg">Avg ${g.key === "year" ? "year" : g.key === "month" ? MONTHS[res.today.getMonth()] : "week"}: ${fmt(g.full.avg)} in</span>` : `<span class="chip">No average yet</span>`}
+          ${g.full ? `<span class="chip avg">Avg ${g.key === "year" ? (MODE === "snow" ? "season" : "year") : g.key === "month" ? MONTHS[res.today.getMonth()] : "week"}: ${fmt(g.full.avg)} in</span>` : `<span class="chip">No average yet</span>`}
           ${g.started && g.byNow && (!g.full || Math.abs(g.byNow.avg - g.full.avg) > 0.005) ? `<span class="chip norm">Normal by ${nice(res.last)}: ${fmt(g.byNow.avg)} in</span>` : ""}
         </div>
         <div><span class="pct">${pctLine(g, cmp && g.pc)}</span></div>`;
@@ -507,8 +538,23 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     document.getElementById("status").hidden = true;
     const yrs = res.gauges[0].full ? res.gauges[0].full.years : 0;
     document.getElementById("sub").textContent =
-      `Rain and melted snow through ${res.last.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}`;
+      `${MODE === "snow" ? "New snowfall" : "Rain and melted snow"} through ${res.last.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}`;
+    const dep = document.getElementById("depth");
+    dep.hidden = MODE !== "snow" || !res.depth;
+    if (res.depth) dep.textContent = `Snow on the ground: ${res.depth.v} in (${res.depth.where}, ${nice(parse(res.depth.d))})`;
     const lag = Math.round((res.today - res.last) / 864e5);
+    if (MODE === "snow") {
+      document.getElementById("foot").innerHTML =
+        `Snowfall is the new snow measured each morning before it melts or settles; its water is already counted in the rain gauges. ` +
+        `Station records via NOAA's ACIS service (data.rcc-acis.org)${data.refreshed ? `, refreshed every morning, last at ${data.refreshed.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : ""}. ` +
+        `This season's totals come from ${stn.sid === BACKUP.sid ? CURRENT[0].name : stn.name}; days it skipped are filled from the next station in the list` +
+        (filledCount ? ` (${filledCount} day${filledCount === 1 ? "" : "s"} this season).` : ".") +
+        ` Pangborn airport doesn't measure snowfall. Averages come from the ${PRIMARY.name} record (${PRIMARY.sid}): the 1995–96 to 2024–25 seasons for the season figure (${yrs} seasons with enough data), and 1996–2025 for months and weeks. ` +
+        `Pitcher Canyon's station doesn't record snow, so it isn't shown here.` +
+        (data.note ? `<br><strong>${data.note}</strong>` : "");
+      play();
+      return;
+    }
     document.getElementById("foot").innerHTML =
       `Station records via NOAA's ACIS service (data.rcc-acis.org). This year's totals come from ${stn.name} (${stn.sid}, ${stn.note}); ` +
       `days it skipped are filled from the next station in the list` +
@@ -545,13 +591,29 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
   let DATA = null;
   function show() {
     const stn = chosenStation();
-    const norm = mergeChain([DATA.primary, DATA.backup]).map;
+    const snow = MODE === "snow";
+    const norm = snow ? mergeChain([DATA.primary], null, 2).map : mergeChain([DATA.primary, DATA.backup]).map;
     const order = [stn, ...CURRENT.filter(c => c !== stn)];
-    const since = `${new Date().getFullYear() - 1}-12-20`;
-    const { map, filled } = mergeChain(order.map(c => DATA.current[c.sid]), since);
+    const now = new Date();
+    const sy = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const since = snow ? `${sy}-06-20` : `${now.getFullYear() - 1}-12-20`;
+    const { map, filled } = mergeChain(order.map(c => DATA.current[c.sid]), since, snow ? 2 : 1);
     const res = compute(map, filled, norm);
-    const year = String(res.today.getFullYear());
-    const filledCount = [...filled].filter(d => d.startsWith(year) && d <= iso(res.last)).length;
+    const from = snow ? `${sy}-07-01` : `${now.getFullYear()}-01-01`;
+    const filledCount = [...filled].filter(d => d >= from && d <= iso(res.last)).length;
+    // newest snow depth report, from the chosen station first
+    res.depth = null;
+    if (snow) {
+      for (let i = 0; i < 10 && !res.depth; i++) {
+        const k = iso(addDays(now, -i));
+        for (const c of order) {
+          const row = (DATA.current[c.sid] || []).find(r => r[0] === k);
+          const v = row ? val(row[3]) : null;
+          if (v != null) { res.depth = { v, d: k, where: c.name }; break; }
+        }
+      }
+    }
+    document.getElementById("cmpWrap").hidden = !window.PITCHER_CANYON || snow;
     render(res, DATA, filledCount, stn);
   }
   const cmpBox = document.getElementById("compare");
@@ -560,6 +622,23 @@ footer { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 2
     cmpBox.checked = compareOn();
     cmpBox.addEventListener("change", () => { try { localStorage.setItem("rain-gauge-compare", cmpBox.checked ? "1" : "0"); } catch (e) {} if (DATA) show(); });
   }
+  function applyMode() {
+    document.body.classList.toggle("snow", MODE === "snow");
+    document.getElementById("mRain").setAttribute("aria-pressed", String(MODE === "rain"));
+    document.getElementById("mSnow").setAttribute("aria-pressed", String(MODE === "snow"));
+    document.getElementById("title").textContent = MODE === "snow" ? "How much snow?" : "How much rain?";
+    document.getElementById("replay").textContent = MODE === "snow" ? "Make it snow" : "Make it rain";
+  }
+  for (const [id, m] of [["mRain", "rain"], ["mSnow", "snow"]]) {
+    document.getElementById(id).addEventListener("click", () => {
+      if (MODE === m) return;
+      MODE = m;
+      try { localStorage.setItem(MODE_KEY, m); } catch (e) {}
+      applyMode();
+      if (DATA) show();
+    });
+  }
+  applyMode();
   const sel = document.getElementById("station");
   CURRENT.forEach(c => { const o = document.createElement("option"); o.value = c.sid; o.textContent = `${c.name} (${c.short})`; sel.appendChild(o); });
   sel.value = chosenStation().sid;

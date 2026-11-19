@@ -6,6 +6,10 @@ Each gauge marks:
 - **Average for the whole period** (dashed orange): the average year, the average for this month, the average for this week of the year.
 - **Normal by this date** (solid green): the average total for the same days so far in past years. The percentage under the gauge compares against this.
 
+## Rain and snow
+
+A **Rain / Snow** switch at the top flips every page between rain (calendar year, month, week) and snowfall (July–June season, month, week). Snow mode also shows the latest snow depth on the ground. Snowfall comes from the CoCoRaHS gauges and the town co-op; its averages use the town record (1995–96 to 2024–25 seasons, 1996–2025 for months and weeks). Pangborn and Pitcher Canyon don't measure snowfall.
+
 ## Two looks
 
 - `index.html`: plain, clean glass gauges.
